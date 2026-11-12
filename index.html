@@ -3,122 +3,260 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f1720">
+<meta name="theme-color" content="#f3f5f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1220" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Precip Log</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>">
 <style>
-:root{--bg:#0f1720;--card:#18222e;--line:#2a3746;--tx:#e6edf3;--mut:#8b9bab;--rain:#4aa3ff;--snow:#c9b8ff;--warn:#ffb347;--bad:#ff6b6b}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.4 system-ui,-apple-system,Roboto,sans-serif;padding:12px 12px 40px;max-width:640px;margin:auto}
-h1{font-size:20px;margin:4px 0}
-h2{font-size:15px;margin:0 0 8px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
-.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+:root{
+  --bg:#f3f5f9;--card:#ffffff;--tx:#0f172a;--mut:#64748b;--line:#e6eaf1;--chip:#eef2f8;
+  --rain:#2f80ed;--rain2:#56ccf2;--snow:#8b7cf6;--warn:#f59e0b;--bad:#ef4444;--ok:#10b981;
+  --shadow:0 1px 2px rgba(15,23,42,.04),0 8px 24px rgba(15,23,42,.06);
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#0b1220;--card:#131c2e;--tx:#e8edf5;--mut:#8a97ab;--line:#1f2a3f;--chip:#1a2438;--shadow:none}
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:560px;margin:auto;padding:16px 16px 100px}
+header{display:flex;align-items:center;justify-content:space-between;margin:4px 2px 14px}
+header h1{font-size:22px;margin:0;font-weight:700;letter-spacing:-.01em}
+header .sub{color:var(--mut);font-size:13px}
+.iconbtn{width:40px;height:40px;border-radius:50%;border:none;background:var(--card);color:var(--tx);box-shadow:var(--shadow);font-size:18px;cursor:pointer}
+.iconbtn.spin{animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.hero{border-radius:24px;padding:20px;color:#fff;background:linear-gradient(140deg,#2f80ed 0%,#3a9be8 55%,#56ccf2 100%);box-shadow:0 10px 30px rgba(47,128,237,.3);position:relative;overflow:hidden}
+.hero.snowy{background:linear-gradient(140deg,#6d5df6 0%,#8b7cf6 55%,#b8a9ff 100%);box-shadow:0 10px 30px rgba(109,93,246,.3)}
+.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:180px;height:180px;border-radius:50%;background:rgba(255,255,255,.12)}
+.hero .lbl{font-size:13px;font-weight:600;opacity:.9;text-transform:uppercase;letter-spacing:.06em}
+.hero .big{font-size:56px;font-weight:700;letter-spacing:-.03em;line-height:1.05;margin-top:6px}
+.hero .big small{font-size:20px;font-weight:600;opacity:.85;margin-left:4px}
+.hero .row2{display:flex;gap:16px;margin-top:8px;font-size:14px;opacity:.95}
+.hero .pill{display:inline-block;margin-top:14px;background:rgba(255,255,255,.2);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;backdrop-filter:blur(4px)}
+
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
+.stat{background:var(--card);border-radius:16px;padding:12px 8px;text-align:center;box-shadow:var(--shadow)}
+.stat .l{font-size:11px;color:var(--mut);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.stat .v{font-size:18px;font-weight:700;color:var(--rain);margin-top:2px}
+.stat .s{font-size:12px;color:var(--snow);font-weight:600}
+
+.card{background:var(--card);border-radius:20px;padding:16px;margin:14px 0;box-shadow:var(--shadow)}
+.card h2{font-size:15px;margin:0 0 12px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.card h2 .mut{font-weight:500}
 .mut{color:var(--mut);font-size:13px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;margin:12px 0}
-button,input{font:inherit;color:var(--tx);background:#223041;border:1px solid var(--line);border-radius:10px;padding:8px 12px}
-button{cursor:pointer}button.pri{background:#2563eb;border-color:#2563eb}
-input{width:100%}
-.tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.tile{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px}
-.tile .l{color:var(--mut);font-size:12px;text-transform:uppercase}
-.tile .r{color:var(--rain);font-size:22px;font-weight:700}
-.tile .s{color:var(--snow);font-size:14px}
-.alert{border-radius:12px;padding:10px 12px;margin:8px 0;font-size:14px}
-.alert.info{background:#16324f;border:1px solid #24527f}
-.alert.warn{background:#4a3410;border:1px solid var(--warn)}
-.alert.bad{background:#4a1616;border:1px solid var(--bad)}
-canvas{width:100%;height:150px;display:block}
-.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.cal .h{text-align:center;color:var(--mut);font-size:11px}
-.cal .d{min-height:50px;background:#1d2937;border-radius:8px;padding:3px;font-size:11px;cursor:pointer;position:relative}
-.cal .d.e{background:none;cursor:default}
-.cal .d.t{outline:2px solid #2563eb}
-.cal .d .n{color:var(--mut)}
-.cal .d .v{color:var(--rain);font-weight:600;font-size:12px}
-.cal .d .sn{color:var(--snow)}
-.cal .d .g{position:absolute;top:2px;right:4px;color:var(--warn);font-size:10px}
-.mon{display:grid;grid-template-columns:40px 1fr 90px;gap:6px;align-items:center;font-size:13px;margin:3px 0}
-.bar{height:10px;border-radius:5px;background:var(--rain)}
-.row{display:flex;gap:8px;align-items:center;margin:8px 0}
-.row>*{flex:1}
-dialog{background:var(--card);color:var(--tx);border:1px solid var(--line);border-radius:14px;width:min(92vw,380px)}
-dialog::backdrop{background:#0009}
-label{font-size:13px;color:var(--mut)}
-.legend span{margin-right:12px;font-size:12px}
+
+.alert{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;margin:8px 0;font-size:14px;background:var(--chip)}
+.alert .ic{font-size:18px;line-height:1.2}
+.alert.warn{background:rgba(245,158,11,.14)}
+.alert.bad{background:rgba(239,68,68,.14)}
+
+canvas{width:100%;height:160px;display:block}
+.legend{display:flex;gap:14px;margin-top:8px}
+.legend span{font-size:12px;color:var(--mut);display:flex;align-items:center;gap:5px}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+
+.monthbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.monthbar h2{margin:0}
+.navbtn{border:none;background:var(--chip);color:var(--tx);width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer}
+.cal{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;text-align:center}
+.cal .h{font-size:11px;color:var(--mut);font-weight:600;padding:4px 0}
+.cal .d{aspect-ratio:1/1.15;border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:4px;cursor:pointer;position:relative}
+.cal .d:active{background:var(--chip)}
+.cal .d.e{cursor:default}
+.cal .d.f{opacity:.35;cursor:default}
+.cal .d .n{font-size:12px;color:var(--mut);font-weight:600}
+.cal .d.t .n{background:var(--rain);color:#fff;border-radius:999px;padding:0 6px}
+.bub{margin-top:3px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff}
+.bub.r{background:var(--rain)}
+.bub.s{background:var(--snow)}
+.cal .g{position:absolute;top:3px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--warn)}
+.totals{display:flex;gap:10px;margin-top:12px}
+.totals div{flex:1;background:var(--chip);border-radius:14px;padding:10px;text-align:center}
+.totals b{display:block;font-size:18px}
+
+.mrow{display:grid;grid-template-columns:34px 1fr 110px;gap:8px;align-items:center;margin:7px 0;font-size:13px}
+.bars{display:flex;flex-direction:column;gap:3px}
+.bars i{display:block;height:8px;border-radius:4px;background:var(--rain)}
+.bars i.prev{background:var(--rain);opacity:.28}
+.mrow .num{text-align:right;color:var(--mut)}
+.mrow .num b{color:var(--tx)}
+
+.setrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);gap:12px}
+.setrow:last-child{border-bottom:none}
+.setrow .t{font-weight:600}
+.setrow .d2{font-size:12px;color:var(--mut)}
+input[type=text],input[type=number],input:not([type]){font:inherit;color:var(--tx);background:var(--chip);border:1px solid transparent;border-radius:12px;padding:10px 12px;width:100%}
+input:focus{outline:none;border-color:var(--rain)}
+.btn{font:inherit;font-weight:600;border:none;border-radius:12px;padding:11px 16px;background:var(--chip);color:var(--tx);cursor:pointer}
+.btn.pri{background:var(--rain);color:#fff}
+.btn.danger{color:var(--bad)}
+.btn.full{width:100%}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:10px 0}
+.sw{position:relative;width:46px;height:28px;flex:none}
+.sw input{opacity:0;width:0;height:0}
+.sw span{position:absolute;inset:0;background:var(--line);border-radius:999px;transition:.2s}
+.sw span::before{content:"";position:absolute;width:22px;height:22px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.sw input:checked+span{background:var(--rain)}
+.sw input:checked+span::before{transform:translateX(18px)}
+
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:flex;justify-content:space-around;padding:8px 6px calc(8px + env(safe-area-inset-bottom));z-index:5}
+nav button{flex:1;border:none;background:none;color:var(--mut);font:inherit;font-size:11px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;padding:4px 0;border-radius:12px}
+nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+nav button.on{color:var(--rain)}
+.view{display:none}.view.on{display:block}
+
+.sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.2s;z-index:10}
+.sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-radius:24px 24px 0 0;padding:10px 18px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .25s,visibility .25s;visibility:hidden;z-index:11;max-width:560px;margin:auto}
+.sheet .grab{width:40px;height:4px;border-radius:2px;background:var(--line);margin:0 auto 12px}
+.sheet.on{transform:none;visibility:visible}.sheet-bg.on{opacity:1;pointer-events:auto}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%) translateY(20px);background:#0f172a;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:.25s;z-index:20;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%)}
+label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:4px}
 </style>
 </head>
 <body>
-<div class="top">
-  <div><h1>💧 Precip Log</h1><div id="status" class="mut">Loading…</div></div>
-  <button id="refresh">↻</button>
-</div>
+<main>
+  <header>
+    <div><h1 id="title">Precip Log</h1><div class="sub" id="status">Loading…</div></div>
+    <button class="iconbtn" id="refresh" aria-label="Refresh">↻</button>
+  </header>
 
-<div id="alerts"></div>
+  <!-- TODAY -->
+  <section class="view on" id="v-home">
+    <div class="hero" id="hero">
+      <div class="lbl">Today</div>
+      <div class="big"><span id="heroRain">0.00</span><small>in rain</small></div>
+      <div class="row2"><span id="heroSnow">❄ 0.0 in snow</span><span id="heroNext"></span></div>
+      <div id="heroPill"></div>
+    </div>
 
-<div class="tiles" id="tiles"></div>
+    <div class="stats" id="stats"></div>
 
-<div class="card">
-  <h2>Next 48 hours</h2>
-  <canvas id="chart"></canvas>
-  <div class="legend mut"><span style="color:var(--rain)">■ rain</span><span style="color:var(--snow)">■ snow (liquid)</span><span>— chance %</span></div>
-</div>
+    <div id="alerts"></div>
 
-<div class="card">
-  <div class="top"><button id="prev">‹</button><h2 id="monthTitle" style="margin:0"></h2><button id="next">›</button></div>
-  <div class="cal" id="cal" style="margin-top:10px"></div>
-  <div class="mut" style="margin-top:6px">Tap a day to enter your own gauge reading. ● = gauge value</div>
-</div>
+    <div class="card">
+      <h2>Next 48 hours <span class="mut" id="next48"></span></h2>
+      <canvas id="chart"></canvas>
+      <div class="legend"><span><i class="dot" style="background:var(--rain)"></i>Rain</span><span><i class="dot" style="background:var(--snow)"></i>Snow (liquid)</span><span><i class="dot" style="background:var(--mut);opacity:.5"></i>Chance</span></div>
+    </div>
 
-<div class="card">
-  <h2 id="yearTitle">This year</h2>
-  <div id="year"></div>
-</div>
+    <div class="card">
+      <h2>Last 7 days</h2>
+      <div id="week"></div>
+    </div>
+  </section>
 
-<details class="card">
-  <summary><b>Settings</b></summary>
-  <div class="row"><div><label>Latitude</label><input id="lat" inputmode="decimal"></div><div><label>Longitude</label><input id="lon" inputmode="decimal"></div></div>
-  <div class="row"><button id="gps">📍 Use my location</button></div>
-  <div class="row"><div><label>Heavy-precip alert threshold (inches / 24 h)</label><input id="thr" inputmode="decimal"></div></div>
-  <div class="row"><button class="pri" id="saveSet">Save settings</button></div>
-  <div class="row"><button id="csv">Export CSV</button><button id="reset">Reset log</button></div>
-  <div class="mut">Data: Open-Meteo (free, no key). Estimates are model/radar-based for your exact coordinates; gauge entries override them.</div>
-</details>
+  <!-- CALENDAR -->
+  <section class="view" id="v-cal">
+    <div class="card">
+      <div class="monthbar"><button class="navbtn" id="prev">‹</button><h2 id="monthTitle"></h2><button class="navbtn" id="next">›</button></div>
+      <div class="cal" id="cal"></div>
+      <div class="totals" id="monthTotals"></div>
+      <div class="mut" style="margin-top:10px">Tap a day to log your own gauge reading. <span style="color:var(--warn)">●</span> = gauge entry</div>
+    </div>
+  </section>
 
-<dialog id="dlg">
-  <h2 id="dlgTitle"></h2>
+  <!-- TRENDS -->
+  <section class="view" id="v-trends">
+    <div class="card">
+      <div class="monthbar"><button class="navbtn" id="yprev">‹</button><h2 id="yearTitle"></h2><button class="navbtn" id="ynext">›</button></div>
+      <div class="totals" id="yearTotals"></div>
+    </div>
+    <div class="card">
+      <h2>Rain by month <span class="mut" id="yearLegend"></span></h2>
+      <div id="year"></div>
+    </div>
+    <div class="card">
+      <h2>Records</h2>
+      <div id="records"></div>
+    </div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="view" id="v-set">
+    <div class="card">
+      <h2>Location</h2>
+      <label class="f">Name</label><input id="locName" placeholder="Home">
+      <div class="grid2">
+        <div><label class="f">Latitude</label><input id="lat" inputmode="decimal"></div>
+        <div><label class="f">Longitude</label><input id="lon" inputmode="decimal"></div>
+      </div>
+      <button class="btn full" id="gps">📍 Use my current location</button>
+    </div>
+    <div class="card">
+      <h2>Alerts</h2>
+      <label class="f">Heavy precipitation threshold (inches in 24 h)</label>
+      <input id="thr" inputmode="decimal">
+      <div id="nativeAlerts" style="display:none;margin-top:6px">
+        <div class="setrow" id="permRow"><div><div class="t">Notifications are off</div><div class="d2">Allow notifications so alerts work in the background</div></div><button class="btn pri" id="allowN">Allow</button></div>
+        <div class="setrow"><div><div class="t">Rain or snow starting soon</div><div class="d2">Within the next 2 hours</div></div><label class="sw"><input type="checkbox" id="nSoon"><span></span></label></div>
+        <div class="setrow"><div><div class="t">Heavy totals</div><div class="d2">Last 24 h over your threshold</div></div><label class="sw"><input type="checkbox" id="nHeavy"><span></span></label></div>
+        <div class="setrow"><div><div class="t">Daily summary</div><div class="d2">Each morning, if it rained or snowed yesterday</div></div><label class="sw"><input type="checkbox" id="nDaily"><span></span></label></div>
+        <button class="btn full" id="testN" style="margin-top:8px">Send a test notification</button>
+      </div>
+      <div id="webAlertsNote" class="mut" style="margin-top:8px">Alerts show at the top of the Today screen while the app is open.</div>
+    </div>
+    <button class="btn pri full" id="saveSet">Save settings</button>
+    <div class="card">
+      <h2>Data</h2>
+      <div class="grid2"><button class="btn" id="csv">Export CSV</button><button class="btn danger" id="reset">Reset log</button></div>
+      <div class="mut">Estimates come from Open-Meteo (free) for your exact coordinates. Gauge entries override them. Snow is shown as depth; totals use about 10:1 snow-to-water when you enter snow yourself.</div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="on" data-v="home"><svg viewBox="0 0 24 24"><path d="M12 2.7S5 10 5 14.5A7 7 0 0 0 19 14.5C19 10 12 2.7 12 2.7z"/></svg>Today</button>
+  <button data-v="cal"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>Calendar</button>
+  <button data-v="trends"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>Trends</button>
+  <button data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
+</nav>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="sheet">
+  <div class="grab"></div>
+  <h2 id="dlgTitle" style="margin:0 0 4px;font-size:18px"></h2>
   <div class="mut" id="dlgModel"></div>
-  <div class="row"><div><label>Rain (in)</label><input id="gRain" inputmode="decimal"></div><div><label>Snow depth (in)</label><input id="gSnow" inputmode="decimal"></div></div>
-  <div class="row"><button class="pri" id="gSave">Save</button><button id="gClear">Use estimate</button><button id="gCancel">Cancel</button></div>
-</dialog>
+  <div class="grid2">
+    <div><label class="f">Rain (in)</label><input id="gRain" inputmode="decimal" placeholder="—"></div>
+    <div><label class="f">Snow depth (in)</label><input id="gSnow" inputmode="decimal" placeholder="—"></div>
+  </div>
+  <div class="grid2"><button class="btn" id="gClear">Use estimate</button><button class="btn pri" id="gSave">Save</button></div>
+</div>
+<div class="toast" id="toast"></div>
 
 <script>
 const KEY='precip-log-v1';
-const DEF={lat:40.63,lon:-89.33,threshold:1,days:{}};
-let S=load(), H=null, OFF=0, viewMonth=null;
+const DEF={lat:40.63,lon:-89.33,name:'Home',threshold:1,nSoon:true,nHeavy:true,nDaily:true,days:{}};
+const NATIVE=typeof window.Android!=='undefined';
+let S=load(),H=null,OFF=0,viewMonth=null,viewYear=null,loading=false;
 const $=id=>document.getElementById(id);
 
-function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.days)return s}catch(e){}return JSON.parse(JSON.stringify(DEF))}
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){status('Could not save to this browser')}}
-function status(t){$('status').textContent=t}
+function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.days)return Object.assign({},DEF,s)}catch(e){}return JSON.parse(JSON.stringify(DEF))}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save')}syncNative()}
+function syncNative(){if(NATIVE){try{Android.saveConfig(JSON.stringify({lat:+S.lat,lon:+S.lon,name:S.name,threshold:+S.threshold,nSoon:!!S.nSoon,nHeavy:!!S.nHeavy,nDaily:!!S.nDaily}))}catch(e){}}}
+function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),2200)}
 const r2=x=>Math.round((+x||0)*100)/100;
 const localNow=()=>new Date(Date.now()+OFF*1000).toISOString().slice(0,16);
 const todayStr=()=>localNow().slice(0,10);
 function addDays(s,n){const d=new Date(s+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 function fmtHour(t){let h=+t.slice(11,13);const ap=h<12?'AM':'PM';h=h%12||12;return h+' '+ap}
-const fmtR=x=>x.toFixed(2)+'"', fmtS=x=>x.toFixed(1)+'"';
+const fr=x=>(+x).toFixed(2), fs=x=>(+x).toFixed(1);
+const dayName=k=>new Date(k+'T12:00Z').toLocaleDateString([], {weekday:'short',timeZone:'UTC'});
+const dateName=k=>new Date(k+'T12:00Z').toLocaleDateString([], {month:'short',day:'numeric',year:'numeric',timeZone:'UTC'});
 
-// Effective values for a day (gauge overrides model)
 function val(k){
   const d=S.days[k]; if(!d) return null;
-  const rain=d.gr!=null?d.gr:d.r, snow=d.gs!=null?d.gs:d.s;
+  const rain=d.gr!=null?d.gr:(d.r||0), snow=d.gs!=null?d.gs:(d.s||0);
   const snowLiquid=d.gs!=null?d.gs/10:Math.max(0,(d.p||0)-(d.r||0));
   return {rain,snow,liquid:rain+snowLiquid,gauge:d.gr!=null||d.gs!=null};
 }
 function sum(from,to){let r=0,s=0,l=0;for(const k in S.days){if(k>=from&&k<=to){const v=val(k);r+=v.rain;s+=v.snow;l+=v.liquid}}return{rain:r,snow:s,liquid:l}}
 
 async function refresh(){
-  status('Updating…');
+  if(loading) return; loading=true; $('refresh').classList.add('spin');
   try{
     const q=new URLSearchParams({latitude:S.lat,longitude:S.lon,timezone:'auto',past_days:92,forecast_days:3,precipitation_unit:'inch',
       daily:'precipitation_sum,rain_sum,showers_sum,snowfall_sum',
@@ -130,25 +268,21 @@ async function refresh(){
     const today=todayStr(), nowH=localNow().slice(0,13);
     d.daily.time.forEach((t,i)=>{
       if(t>=today) return;
-      const day=S.days[t]||{};
-      day.r=r2((d.daily.rain_sum[i]||0)+(d.daily.showers_sum[i]||0));
-      day.s=r2(d.daily.snowfall_sum[i]||0);
-      day.p=r2(d.daily.precipitation_sum[i]||0);
-      S.days[t]=day;
+      S.days[t]=Object.assign(S.days[t]||{},{r:r2((d.daily.rain_sum[i]||0)+(d.daily.showers_sum[i]||0)),s:r2(d.daily.snowfall_sum[i]||0),p:r2(d.daily.precipitation_sum[i]||0)});
     });
-    // Today so far, from hourly data up to the current hour
     let r=0,s=0,p=0;
     H.time.forEach((t,i)=>{if(t.slice(0,10)===today&&t.slice(0,13)<=nowH){r+=(H.rain[i]||0)+(H.showers[i]||0);s+=H.snowfall[i]||0;p+=H.precipitation[i]||0}});
     S.days[today]=Object.assign(S.days[today]||{},{r:r2(r),s:r2(s),p:r2(p)});
-    await backfill(today, d.daily.time[0]);
-    S.updated=Date.now(); save(); render();
-  }catch(e){status('Update failed ('+e.message+') — showing saved data');render()}
+    await backfill(today,d.daily.time[0]);
+    S.updated=Date.now(); save();
+  }catch(e){toast('Update failed — showing saved data')}
+  loading=false; $('refresh').classList.remove('spin'); render();
 }
 
-// Fill Jan 1 → 92 days ago from the free historical archive (once per location/year)
-async function backfill(today, firstFc){
-  const start=today.slice(0,4)+'-01-01', tag=start+'|'+S.lat+','+S.lon;
-  if(start>=firstFc||S.backfilled===tag) return;
+// Backfill Jan 1 of last year → ~92 days ago from the free archive, once per location
+async function backfill(today,firstFc){
+  const start=(+today.slice(0,4)-1)+'-01-01', tag=start+'|'+S.lat+','+S.lon;
+  if(S.backfilled===tag) return;
   try{
     const q=new URLSearchParams({latitude:S.lat,longitude:S.lon,timezone:'auto',start_date:start,end_date:addDays(firstFc,-1),
       precipitation_unit:'inch',daily:'precipitation_sum,rain_sum,snowfall_sum'});
@@ -157,6 +291,7 @@ async function backfill(today, firstFc){
     const d=await res.json();
     d.daily.time.forEach((t,i)=>{
       if(S.days[t]&&S.days[t].r!=null) return;
+      if(d.daily.precipitation_sum[i]==null) return;
       S.days[t]=Object.assign(S.days[t]||{},{r:r2(d.daily.rain_sum[i]),s:r2(d.daily.snowfall_sum[i]),p:r2(d.daily.precipitation_sum[i])});
     });
     S.backfilled=tag;
@@ -166,133 +301,189 @@ async function backfill(today, firstFc){
 function render(){
   const today=todayStr();
   if(!viewMonth) viewMonth=today.slice(0,7);
-  if(S.updated) status('Updated '+new Date(S.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})+' · '+(+S.lat).toFixed(2)+', '+(+S.lon).toFixed(2));
-  // Tiles
-  const tiles=[['Today so far',today,today],['Last 7 days',addDays(today,-6),today],['This month',today.slice(0,7)+'-01',today],['Year to date',today.slice(0,4)+'-01-01',today]];
-  $('tiles').innerHTML=tiles.map(([l,a,b])=>{const v=sum(a,b);return `<div class="tile"><div class="l">${l}</div><div class="r">${fmtR(v.rain)}</div><div class="s">❄ ${fmtS(v.snow)} snow</div></div>`}).join('');
-  renderAlerts(); drawChart(); renderCal(); renderYear();
+  if(!viewYear) viewYear=+today.slice(0,4);
+  $('title').textContent=S.name||'Precip Log';
+  $('status').textContent=S.updated?'Updated '+new Date(S.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Not updated yet';
+  renderHome(today); renderCal(today); renderYear(today);
 }
 
-function renderAlerts(){
-  const out=[];
-  if(H){
-    const nowH=localNow().slice(0,13);
-    const i0=H.time.findIndex(t=>t.slice(0,13)>nowH);
-    if(i0>0){
-      let rr=0,ss=0,start=null,pmax=0,next24=0,past24=0;
-      for(let i=i0;i<i0+6&&i<H.time.length;i++){
-        const r=(H.rain[i]||0)+(H.showers[i]||0), s=H.snowfall[i]||0;
-        if(!start&&(r>=0.01||s>=0.1)) start=H.time[i];
-        rr+=r; ss+=s; pmax=Math.max(pmax,H.precipitation_probability[i]||0);
-      }
-      for(let i=i0;i<i0+24&&i<H.time.length;i++) next24+=H.precipitation[i]||0;
-      for(let i=Math.max(0,i0-24);i<i0;i++) past24+=H.precipitation[i]||0;
-      if(start) out.push(['info',`${ss>=0.1?'❄️ Snow':'🌧️ Rain'} expected around ${fmtHour(start)}. Next 6 h: ${fmtR(rr)} rain${ss>0?', '+fmtS(ss)+' snow':''} (up to ${pmax}% chance).`]);
-      if(past24>=S.threshold) out.push(['bad',`⚠️ ${fmtR(past24)} of precipitation in the last 24 hours, over your ${fmtR(+S.threshold)} threshold.`]);
-      if(next24>=S.threshold) out.push(['warn',`⚠️ ${fmtR(next24)} forecast in the next 24 hours, over your ${fmtR(+S.threshold)} threshold.`]);
-    }
+function computeAlerts(){
+  const out=[]; let next=null;
+  if(!H) return {out,next};
+  const nowH=localNow().slice(0,13), i0=H.time.findIndex(t=>t.slice(0,13)>nowH);
+  if(i0<=0) return {out,next};
+  let rr=0,ss=0,start=null,pmax=0,n24=0,p24=0;
+  for(let i=i0;i<i0+6&&i<H.time.length;i++){
+    const r=(H.rain[i]||0)+(H.showers[i]||0),s=H.snowfall[i]||0;
+    if(!start&&(r>=0.01||s>=0.1)) start=H.time[i];
+    rr+=r;ss+=s;pmax=Math.max(pmax,H.precipitation_probability[i]||0);
   }
-  $('alerts').innerHTML=out.map(([c,t])=>`<div class="alert ${c}">${t}</div>`).join('');
+  for(let i=i0;i<i0+24&&i<H.time.length;i++) n24+=H.precipitation[i]||0;
+  for(let i=Math.max(0,i0-24);i<i0;i++) p24+=H.precipitation[i]||0;
+  if(start){next=`${ss>=0.1?'Snow':'Rain'} around ${fmtHour(start)}`;out.push(['',ss>=0.1?'❄️':'🌧️',`${ss>=0.1?'Snow':'Rain'} expected around ${fmtHour(start)}. Next 6 h: ${fr(rr)}" rain${ss>0?', '+fs(ss)+'" snow':''} · up to ${pmax}% chance.`])}
+  if(p24>=S.threshold) out.push(['bad','⚠️',`${fr(p24)}" in the last 24 hours — over your ${fr(S.threshold)}" threshold.`]);
+  if(n24>=S.threshold) out.push(['warn','⚠️',`${fr(n24)}" forecast in the next 24 hours — over your ${fr(S.threshold)}" threshold.`]);
+  return {out,next};
+}
+
+function renderHome(today){
+  const t=val(today)||{rain:0,snow:0};
+  $('heroRain').textContent=fr(t.rain);
+  $('heroSnow').textContent='❄ '+fs(t.snow)+' in snow';
+  $('hero').classList.toggle('snowy',t.snow>0&&t.snow/10>t.rain);
+  const a=computeAlerts();
+  $('heroPill').innerHTML=a.next?`<span class="pill">${a.next}</span>`:(H?'<span class="pill">No precipitation in the next 6 h</span>':'');
+  $('alerts').innerHTML=a.out.map(([c,ic,t])=>`<div class="alert ${c}"><span class="ic">${ic}</span><span>${t}</span></div>`).join('');
+  const sts=[['24 h',addDays(today,-1),today],['7 days',addDays(today,-6),today],['30 days',addDays(today,-29),today],['Year',today.slice(0,4)+'-01-01',today]];
+  $('stats').innerHTML=sts.map(([l,a,b])=>{const v=sum(a,b);return `<div class="stat"><div class="l">${l}</div><div class="v">${fr(v.rain)}"</div><div class="s">❄ ${fs(v.snow)}"</div></div>`}).join('');
+  // week list
+  let max=0.05;const days=[];for(let i=6;i>=0;i--){const k=addDays(today,-i),v=val(k)||{rain:0,snow:0,liquid:0};days.push([k,v]);max=Math.max(max,v.liquid)}
+  $('week').innerHTML=days.map(([k,v])=>`<div class="mrow"><span class="mut">${k===today?'Today':dayName(k)}</span><div class="bars"><i style="width:${Math.max(v.liquid>0?3:0,v.liquid/max*100)}%;background:${v.snow>0&&v.rain<0.01?'var(--snow)':'var(--rain)'}"></i></div><span class="num"><b>${fr(v.rain)}"</b>${v.snow>=0.1?' · ❄'+fs(v.snow):''}</span></div>`).join('');
+  drawChart();
 }
 
 function drawChart(){
-  const c=$('chart'), dpr=window.devicePixelRatio||1, W=c.clientWidth, Ht=150;
-  c.width=W*dpr; c.height=Ht*dpr; const g=c.getContext('2d'); g.scale(dpr,dpr); g.clearRect(0,0,W,Ht);
-  if(!H){return}
-  const nowH=localNow().slice(0,13);
-  let i0=H.time.findIndex(t=>t.slice(0,13)>=nowH); if(i0<0) return;
-  const n=Math.min(48,H.time.length-i0), pad=18, bw=(W)/n;
-  let max=0.1; for(let i=0;i<n;i++) max=Math.max(max,H.precipitation[i0+i]||0);
-  const cs=getComputedStyle(document.documentElement);
-  g.font='10px system-ui'; g.fillStyle=cs.getPropertyValue('--mut');
-  g.fillText(max.toFixed(2)+'"/h',2,10);
+  const c=$('chart'),dpr=window.devicePixelRatio||1,W=c.clientWidth,Ht=160;
+  if(!W) return;
+  c.width=W*dpr;c.height=Ht*dpr;const g=c.getContext('2d');g.scale(dpr,dpr);g.clearRect(0,0,W,Ht);
+  if(!H) return;
+  const nowH=localNow().slice(0,13),i0=H.time.findIndex(t=>t.slice(0,13)>=nowH);if(i0<0) return;
+  const n=Math.min(48,H.time.length-i0),bot=20,top=14,bw=W/n,cs=getComputedStyle(document.documentElement);
+  const col=v=>cs.getPropertyValue(v).trim();
+  let max=0.1,tot=0;for(let i=0;i<n;i++){const p=H.precipitation[i0+i]||0;max=Math.max(max,p);tot+=p}
+  $('next48').textContent=fr(tot)+'" total';
+  g.strokeStyle=col('--line');g.lineWidth=1;g.beginPath();g.moveTo(0,Ht-bot+.5);g.lineTo(W,Ht-bot+.5);g.stroke();
+  g.font='600 10px system-ui';
   for(let i=0;i<n;i++){
-    const k=i0+i, p=H.precipitation[k]||0, snow=(H.snowfall[k]||0)>0;
-    const h=(p/max)*(Ht-pad-14);
-    g.fillStyle=snow?cs.getPropertyValue('--snow'):cs.getPropertyValue('--rain');
-    g.fillRect(i*bw+1,Ht-pad-h,Math.max(1,bw-2),h);
-    if(H.time[k].slice(11,13)%6===0){g.fillStyle=cs.getPropertyValue('--mut');g.fillText(fmtHour(H.time[k]),i*bw,Ht-4)}
+    const k=i0+i,p=H.precipitation[k]||0,snow=(H.snowfall[k]||0)>0,h=(p/max)*(Ht-bot-top);
+    if(h>0.5){
+      g.fillStyle=snow?col('--snow'):col('--rain');
+      const x=i*bw+1.5,w=Math.max(2,bw-3),y=Ht-bot-h,rad=Math.min(w/2,4);
+      g.beginPath();g.moveTo(x,Ht-bot);g.lineTo(x,y+rad);g.quadraticCurveTo(x,y,x+rad,y);g.lineTo(x+w-rad,y);g.quadraticCurveTo(x+w,y,x+w,y+rad);g.lineTo(x+w,Ht-bot);g.fill();
+    }
+    const hh=+H.time[k].slice(11,13);
+    if(hh%6===0){g.fillStyle=col('--mut');g.fillText(hh===0?dayName(H.time[k].slice(0,10)):fmtHour(H.time[k]),i*bw,Ht-5)}
   }
-  g.strokeStyle='#ffffff55'; g.beginPath();
-  for(let i=0;i<n;i++){const pr=(H.precipitation_probability[i0+i]||0)/100, y=Ht-pad-pr*(Ht-pad-14), x=i*bw+bw/2; i?g.lineTo(x,y):g.moveTo(x,y)}
-  g.stroke();
+  g.strokeStyle=col('--mut');g.globalAlpha=.45;g.lineWidth=1.5;g.beginPath();
+  for(let i=0;i<n;i++){const pr=(H.precipitation_probability[i0+i]||0)/100,y=Ht-bot-pr*(Ht-bot-top),x=i*bw+bw/2;i?g.lineTo(x,y):g.moveTo(x,y)}
+  g.stroke();g.globalAlpha=1;
+  g.fillStyle=col('--mut');g.fillText(fr(max)+'"/h',2,10);
 }
 
-function renderCal(){
-  const [y,m]=viewMonth.split('-').map(Number), today=todayStr();
+function renderCal(today){
+  const [y,m]=viewMonth.split('-').map(Number);
   $('monthTitle').textContent=new Date(Date.UTC(y,m-1,1)).toLocaleString([], {month:'long',year:'numeric',timeZone:'UTC'});
-  const first=new Date(Date.UTC(y,m-1,1)).getUTCDay(), dim=new Date(Date.UTC(y,m,0)).getUTCDate();
+  const first=new Date(Date.UTC(y,m-1,1)).getUTCDay(),dim=new Date(Date.UTC(y,m,0)).getUTCDate();
   let h='SMTWTFS'.split('').map(x=>`<div class="h">${x}</div>`).join('');
   for(let i=0;i<first;i++) h+='<div class="d e"></div>';
-  let mr=0,ms=0;
+  let mr=0,ms=0,rainy=0;
   for(let d=1;d<=dim;d++){
-    const k=`${viewMonth}-${String(d).padStart(2,'0')}`, v=val(k);
-    if(v){mr+=v.rain;ms+=v.snow}
-    h+=`<div class="d${k===today?' t':''}" data-k="${k}"><div class="n">${d}</div>`+
-      (v&&v.rain>=0.01?`<div class="v">${v.rain.toFixed(2)}</div>`:'')+
-      (v&&v.snow>=0.1?`<div class="sn">❄${v.snow.toFixed(1)}</div>`:'')+
-      (v&&v.gauge?'<span class="g">●</span>':'')+'</div>';
+    const k=`${viewMonth}-${String(d).padStart(2,'0')}`,v=val(k),fut=k>today;
+    let b='';
+    if(v){mr+=v.rain;ms+=v.snow;if(v.liquid>=0.01)rainy++;
+      if(v.snow>=0.1&&v.snow/10>=v.rain){const sz=Math.min(34,16+Math.sqrt(v.snow)*7);b=`<div class="bub s" style="width:${sz}px;height:${sz}px">${fs(v.snow)}</div>`}
+      else if(v.rain>=0.01){const sz=Math.min(34,16+Math.sqrt(v.rain)*16);b=`<div class="bub r" style="width:${sz}px;height:${sz}px">${v.rain<1?v.rain.toFixed(2).slice(1):fr(v.rain).replace(/0$/,'')}</div>`}}
+    h+=`<div class="d${k===today?' t':''}${fut?' f':''}" data-k="${k}"><span class="n">${d}</span>${b}${v&&v.gauge?'<span class="g"></span>':''}</div>`;
   }
-  $('cal').innerHTML=h+`<div style="grid-column:1/-1" class="mut">Month: ${fmtR(mr)} rain · ${fmtS(ms)} snow</div>`;
+  $('cal').innerHTML=h;
+  $('monthTotals').innerHTML=`<div><b style="color:var(--rain)">${fr(mr)}"</b><span class="mut">rain</span></div><div><b style="color:var(--snow)">${fs(ms)}"</b><span class="mut">snow</span></div><div><b>${rainy}</b><span class="mut">wet days</span></div>`;
   $('cal').querySelectorAll('.d[data-k]').forEach(el=>el.onclick=()=>openDay(el.dataset.k));
 }
 
-function renderYear(){
-  const y=viewMonth.slice(0,4); $('yearTitle').textContent=y+' by month';
-  const rows=[];let max=0.01;
-  for(let m=1;m<=12;m++){const mm=`${y}-${String(m).padStart(2,'0')}`, v=sum(mm+'-01',mm+'-31');rows.push([mm,v]);max=Math.max(max,v.rain)}
-  $('year').innerHTML=rows.map(([mm,v])=>`<div class="mon"><span>${new Date(mm+'-15T12:00Z').toLocaleString([], {month:'short',timeZone:'UTC'})}</span><div class="bar" style="width:${(v.rain/max*100).toFixed(0)}%"></div><span class="mut">${fmtR(v.rain)} · ❄${v.snow.toFixed(1)}</span></div>`).join('');
+function renderYear(today){
+  const y=viewYear,py=y-1;
+  $('yearTitle').textContent=y;
+  const cut=today.slice(4); // same date last year for comparison
+  const ytd=sum(y+'-01-01',y+'-12-31'),lastSame=sum(py+'-01-01',py+cut),lastAll=sum(py+'-01-01',py+'-12-31');
+  const isCur=String(y)===today.slice(0,4);
+  $('yearTotals').innerHTML=`<div><b style="color:var(--rain)">${fr(ytd.rain)}"</b><span class="mut">rain</span></div><div><b style="color:var(--snow)">${fs(ytd.snow)}"</b><span class="mut">snow</span></div><div><b>${fr(isCur?lastSame.rain:lastAll.rain)}"</b><span class="mut">${py} ${isCur?'to date':'rain'}</span></div>`;
+  $('yearLegend').textContent=`dark ${y} · light ${py}`;
+  const rows=[];let max=0.05;
+  for(let m=1;m<=12;m++){const mm=String(m).padStart(2,'0'),a=sum(`${y}-${mm}-01`,`${y}-${mm}-31`),b=sum(`${py}-${mm}-01`,`${py}-${mm}-31`);rows.push([m,a,b]);max=Math.max(max,a.rain,b.rain)}
+  $('year').innerHTML=rows.map(([m,a,b])=>`<div class="mrow"><span class="mut">${new Date(Date.UTC(2000,m-1,15)).toLocaleString([], {month:'short',timeZone:'UTC'})}</span><div class="bars"><i style="width:${a.rain/max*100}%"></i><i class="prev" style="width:${b.rain/max*100}%"></i></div><span class="num"><b>${fr(a.rain)}"</b>${a.snow>=0.1?' · ❄'+fs(a.snow):''}</span></div>`).join('');
+  let wet=null,snowy=null,streak=0,best=0;
+  Object.keys(S.days).filter(k=>k.startsWith(y+'-')).sort().forEach(k=>{const v=val(k);
+    if(!wet||v.rain>wet[1])wet=[k,v.rain];if(!snowy||v.snow>snowy[1])snowy=[k,v.snow];
+    if(v.liquid<0.01){streak++;best=Math.max(best,streak)}else streak=0});
+  $('records').innerHTML=[
+    ['Wettest day',wet&&wet[1]>0?`${fr(wet[1])}" · ${dateName(wet[0])}`:'—'],
+    ['Snowiest day',snowy&&snowy[1]>0?`${fs(snowy[1])}" · ${dateName(snowy[0])}`:'—'],
+    ['Longest dry streak',best?best+' days':'—']
+  ].map(([a,b])=>`<div class="setrow"><span class="t">${a}</span><span class="mut">${b}</span></div>`).join('');
 }
 
+// Gauge entry sheet
 let editKey=null;
 function openDay(k){
   if(k>todayStr()) return;
-  editKey=k; const d=S.days[k]||{};
-  $('dlgTitle').textContent=new Date(k+'T12:00Z').toLocaleDateString([], {weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
-  $('dlgModel').textContent=d.r!=null?`Estimate: ${fmtR(d.r)} rain, ${fmtS(d.s)} snow`:'No estimate for this day';
-  $('gRain').value=d.gr??''; $('gSnow').value=d.gs??'';
-  $('dlg').showModal();
+  editKey=k;const d=S.days[k]||{};
+  $('dlgTitle').textContent=new Date(k+'T12:00Z').toLocaleDateString([], {weekday:'long',month:'long',day:'numeric',timeZone:'UTC'});
+  $('dlgModel').textContent=d.r!=null?`Estimate: ${fr(d.r)}" rain · ${fs(d.s)}" snow`:'No estimate for this day';
+  $('gRain').value=d.gr??'';$('gSnow').value=d.gs??'';
+  $('sheet').classList.add('on');$('sheetBg').classList.add('on');
 }
+function closeSheet(){$('sheet').classList.remove('on');$('sheetBg').classList.remove('on')}
+$('sheetBg').onclick=closeSheet;
 $('gSave').onclick=()=>{
   const d=S.days[editKey]||(S.days[editKey]={r:0,s:0,p:0});
-  const r=$('gRain').value.trim(), s=$('gSnow').value.trim();
-  if(r!=='') d.gr=r2(r); else delete d.gr;
-  if(s!=='') d.gs=r2(s); else delete d.gs;
-  save(); $('dlg').close(); render();
+  const r=$('gRain').value.trim(),s=$('gSnow').value.trim();
+  if(r!==''&&!isNaN(+r))d.gr=r2(r);else delete d.gr;
+  if(s!==''&&!isNaN(+s))d.gs=r2(s);else delete d.gs;
+  save();closeSheet();render();toast('Saved');
 };
-$('gClear').onclick=()=>{const d=S.days[editKey]; if(d){delete d.gr;delete d.gs} save(); $('dlg').close(); render()};
-$('gCancel').onclick=()=>$('dlg').close();
+$('gClear').onclick=()=>{const d=S.days[editKey];if(d){delete d.gr;delete d.gs}save();closeSheet();render()};
 
-$('prev').onclick=()=>{viewMonth=addDays(viewMonth+'-01',-1).slice(0,7);renderCal();renderYear()};
-$('next').onclick=()=>{viewMonth=addDays(viewMonth+'-28',5).slice(0,7);renderCal();renderYear()};
+// Navigation
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
+  if(b.dataset.v==='home') drawChart();
+  window.scrollTo(0,0);
+});
+$('prev').onclick=()=>{viewMonth=addDays(viewMonth+'-01',-1).slice(0,7);renderCal(todayStr())};
+$('next').onclick=()=>{viewMonth=addDays(viewMonth+'-28',5).slice(0,7);renderCal(todayStr())};
+$('yprev').onclick=()=>{viewYear--;renderYear(todayStr())};
+$('ynext').onclick=()=>{viewYear++;renderYear(todayStr())};
 $('refresh').onclick=refresh;
 
-function fillSettings(){$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold}
+// Settings
+function fillSettings(){
+  $('locName').value=S.name||'';$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold;
+  $('nSoon').checked=!!S.nSoon;$('nHeavy').checked=!!S.nHeavy;$('nDaily').checked=!!S.nDaily;
+  if(NATIVE){$('nativeAlerts').style.display='block';$('webAlertsNote').style.display='none';updatePerm()}
+}
+function updatePerm(){try{$('permRow').style.display=Android.notificationsAllowed()?'none':'flex'}catch(e){}}
+window.onNotifPermission=()=>updatePerm();
 $('gps').onclick=()=>{
-  if(!navigator.geolocation) return status('Location not available');
-  navigator.geolocation.getCurrentPosition(p=>{$('lat').value=p.coords.latitude.toFixed(4);$('lon').value=p.coords.longitude.toFixed(4)},e=>status('Location error: '+e.message),{enableHighAccuracy:true});
+  if(!navigator.geolocation) return toast('Location not available');
+  toast('Finding your location…');
+  navigator.geolocation.getCurrentPosition(p=>{$('lat').value=p.coords.latitude.toFixed(4);$('lon').value=p.coords.longitude.toFixed(4);toast('Location found — tap Save')},e=>toast('Location error: '+e.message),{enableHighAccuracy:true,timeout:15000});
 };
 $('saveSet').onclick=()=>{
-  const lat=+$('lat').value, lon=+$('lon').value, thr=+$('thr').value;
-  if(isNaN(lat)||isNaN(lon)||Math.abs(lat)>90||Math.abs(lon)>180) return status('Invalid coordinates');
+  const lat=+$('lat').value,lon=+$('lon').value,thr=+$('thr').value;
+  if(isNaN(lat)||isNaN(lon)||Math.abs(lat)>90||Math.abs(lon)>180) return toast('Invalid coordinates');
   const moved=Math.abs(lat-S.lat)>0.01||Math.abs(lon-S.lon)>0.01;
-  if(moved&&Object.keys(S.days).length&&!confirm('Changing location starts a new log. Gauge entries will be cleared. Continue?')) return;
+  if(moved&&Object.keys(S.days).length&&!confirm('Changing location starts a new log and clears gauge entries. Continue?')) return;
   if(moved){S.days={};delete S.backfilled}
-  S.lat=lat;S.lon=lon;if(thr>0)S.threshold=thr;save();refresh();
+  S.lat=lat;S.lon=lon;S.name=$('locName').value.trim()||'Home';if(thr>0)S.threshold=thr;
+  S.nSoon=$('nSoon').checked;S.nHeavy=$('nHeavy').checked;S.nDaily=$('nDaily').checked;
+  save();toast('Settings saved');if(moved)refresh();else render();
 };
+$('allowN').onclick=()=>{try{Android.requestNotifications()}catch(e){}};
+$('testN').onclick=()=>{try{Android.testNotification()}catch(e){}};
 $('csv').onclick=()=>{
   const rows=[['date','rain_in','snow_in','liquid_in','source']];
-  Object.keys(S.days).sort().forEach(k=>{const v=val(k);rows.push([k,v.rain.toFixed(2),v.snow.toFixed(1),v.liquid.toFixed(2),v.gauge?'gauge':'estimate'])});
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([rows.map(r=>r.join(',')).join('\n')],{type:'text/csv'}));
-  a.download='precip-log.csv'; a.click();
+  Object.keys(S.days).sort().forEach(k=>{const v=val(k);rows.push([k,fr(v.rain),fs(v.snow),fr(v.liquid),v.gauge?'gauge':'estimate'])});
+  const csv=rows.map(r=>r.join(',')).join('\n');
+  if(NATIVE){try{Android.saveCsv(csv);return}catch(e){}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download='precip-log.csv';a.click();
 };
-$('reset').onclick=()=>{if(confirm('Delete all saved data, including gauge entries?')){S=JSON.parse(JSON.stringify(DEF));save();fillSettings();refresh()}};
+$('reset').onclick=()=>{if(confirm('Delete all saved data, including gauge entries?')){const keep={lat:S.lat,lon:S.lon,name:S.name};S=Object.assign(JSON.parse(JSON.stringify(DEF)),keep);save();fillSettings();refresh()}};
 
-document.addEventListener('visibilitychange',()=>{if(!document.hidden&&Date.now()-(S.updated||0)>10*60e3)refresh()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){updatePerm&&NATIVE&&updatePerm();if(Date.now()-(S.updated||0)>10*60e3)refresh()}});
 setInterval(()=>{if(!document.hidden)refresh()},15*60e3);
 window.addEventListener('resize',drawChart);
-fillSettings(); render(); refresh();
+fillSettings();syncNative();render();refresh();
 </script>
 </body>
 </html>
