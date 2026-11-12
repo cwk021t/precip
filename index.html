@@ -235,7 +235,7 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
 const KEY='precip-log-v1';
 const DEF={lat:40.63,lon:-89.33,name:'Home',threshold:1,snowThreshold:4,nSoon:true,nHeavy:true,nDaily:true,nAhead:true,nNws:true,days:{}};
 const NATIVE=typeof window.Android!=='undefined';
-let S=load(),H=null,NWS=[],OFF=0,viewMonth=null,viewYear=null,loading=false;
+let S=load(),H=null,NWS=[],OFF=0,lastErr=null,viewMonth=null,viewYear=null,loading=false;
 const $=id=>document.getElementById(id);
 
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.days)return Object.assign({},DEF,s)}catch(e){}return JSON.parse(JSON.stringify(DEF))}
@@ -265,9 +265,8 @@ async function refresh(){
     const q=new URLSearchParams({latitude:S.lat,longitude:S.lon,timezone:'auto',past_days:92,forecast_days:3,precipitation_unit:'inch',
       daily:'precipitation_sum,rain_sum,showers_sum,snowfall_sum',
       hourly:'precipitation,rain,showers,snowfall,precipitation_probability'});
-    const res=await fetch('https://api.open-meteo.com/v1/forecast?'+q);
-    if(!res.ok) throw new Error('HTTP '+res.status);
-    const d=await res.json();
+    const d=await getJson('https://api.open-meteo.com/v1/forecast?'+q);
+    if(!d.hourly||!d.daily) throw new Error(d.reason||'Unexpected response');
     H=d.hourly; OFF=d.utc_offset_seconds||0;
     const today=todayStr(), nowH=localNow().slice(0,13);
     d.daily.time.forEach((t,i)=>{
@@ -279,16 +278,14 @@ async function refresh(){
     S.days[today]=Object.assign(S.days[today]||{},{r:r2(r),s:r2(s),p:r2(p)});
     await backfill(today,d.daily.time[0]);
     await loadNws();
-    S.updated=Date.now(); save();
-  }catch(e){toast('Update failed — showing saved data')}
+    S.updated=Date.now(); lastErr=null; save();
+  }catch(e){lastErr=e.message||String(e);toast('Update failed: '+lastErr)}
   loading=false; $('refresh').classList.remove('spin'); render();
 }
 
 async function loadNws(){
   try{
-    const res=await fetch(`https://api.weather.gov/alerts/active?point=${(+S.lat).toFixed(4)},${(+S.lon).toFixed(4)}`,{headers:{Accept:'application/geo+json'}});
-    if(!res.ok) return;
-    const j=await res.json();
+    const j=await getJson(`https://api.weather.gov/alerts/active?point=${(+S.lat).toFixed(4)},${(+S.lon).toFixed(4)}`);
     NWS=(j.features||[]).map(f=>f.properties).filter(p=>/flood|winter|snow|ice|blizzard|freez|sleet|rain|storm/i.test(p.event||''));
   }catch(e){}
 }
@@ -319,6 +316,19 @@ function heavyAhead(){
   return res;
 }
 
+// In the Android app, requests go through native networking; in a browser, through fetch
+async function getJson(url){
+  if(NATIVE&&typeof Android.httpGet==='function'){
+    await new Promise(r=>setTimeout(r,0));
+    const r=JSON.parse(Android.httpGet(url));
+    if(r.status!==200) throw new Error(r.error||('HTTP '+r.status+(r.body?': '+r.body.slice(0,100):'')));
+    return JSON.parse(r.body);
+  }
+  const res=await fetch(url);
+  if(!res.ok) throw new Error('HTTP '+res.status);
+  return res.json();
+}
+
 // Backfill Jan 1 of last year → ~92 days ago from the free archive, once per location
 async function backfill(today,firstFc){
   const start=(+today.slice(0,4)-1)+'-01-01', tag=start+'|'+S.lat+','+S.lon;
@@ -326,9 +336,8 @@ async function backfill(today,firstFc){
   try{
     const q=new URLSearchParams({latitude:S.lat,longitude:S.lon,timezone:'auto',start_date:start,end_date:addDays(firstFc,-1),
       precipitation_unit:'inch',daily:'precipitation_sum,rain_sum,snowfall_sum'});
-    const res=await fetch('https://archive-api.open-meteo.com/v1/archive?'+q);
-    if(!res.ok) return;
-    const d=await res.json();
+    const d=await getJson('https://archive-api.open-meteo.com/v1/archive?'+q);
+    if(!d.daily) return;
     d.daily.time.forEach((t,i)=>{
       if(S.days[t]&&S.days[t].r!=null) return;
       if(d.daily.precipitation_sum[i]==null) return;
@@ -343,7 +352,8 @@ function render(){
   if(!viewMonth) viewMonth=today.slice(0,7);
   if(!viewYear) viewYear=+today.slice(0,4);
   $('title').textContent=S.name||'Precip Log';
-  $('status').textContent=S.updated?'Updated '+new Date(S.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Not updated yet';
+  $('status').textContent=lastErr?'⚠ Update failed: '+lastErr:(S.updated?'Updated '+new Date(S.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Not updated yet');
+  $('status').style.color=lastErr?'var(--bad)':'';
   renderHome(today); renderCal(today); renderYear(today);
 }
 

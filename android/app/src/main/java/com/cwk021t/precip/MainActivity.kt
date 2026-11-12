@@ -147,6 +147,29 @@ class MainActivity : Activity() {
             }
         }
 
+        /** Native HTTP GET for the weather APIs (avoids WebView CORS/network quirks). */
+        @JavascriptInterface
+        fun httpGet(url: String): String {
+            val out = org.json.JSONObject()
+            val host = try { java.net.URL(url).host } catch (e: Exception) { "" }
+            if (!(host.endsWith("open-meteo.com") || host == "api.weather.gov")) {
+                return out.put("status", 0).put("error", "Blocked host").toString()
+            }
+            return try {
+                val con = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+                con.setRequestProperty("User-Agent", "PrecipLog (github.com/cwk021t/precip)")
+                con.setRequestProperty("Accept", "application/geo+json, application/json")
+                con.connectTimeout = 20000
+                con.readTimeout = 30000
+                val code = con.responseCode
+                val body = (if (code < 400) con.inputStream else con.errorStream)?.bufferedReader()?.readText() ?: ""
+                con.disconnect()
+                out.put("status", code).put("body", body).toString()
+            } catch (e: Exception) {
+                out.put("status", 0).put("error", e.javaClass.simpleName + ": " + (e.message ?: "")).toString()
+            }
+        }
+
         @JavascriptInterface
         fun testNotification() {
             Notifier.show(this@MainActivity, 99, "Precip Log", "Notifications are working. You'll get rain and snow alerts here.")
