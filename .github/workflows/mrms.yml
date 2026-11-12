@@ -1,0 +1,72 @@
+name: Update radar rainfall (MRMS)
+
+on:
+  schedule:
+    - cron: '17 * * * *'   # hourly
+  workflow_dispatch:
+    inputs:
+      backfill_from:
+        description: 'Backfill daily history from this date (YYYY-MM-DD), blank for normal update'
+        required: false
+        default: ''
+      dry_run:
+        description: 'Test only: public test point, print values, save nothing'
+        type: boolean
+        default: false
+      reset:
+        description: 'Clear saved history first (use after changing HOME_LAT/HOME_LON)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mrms
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get data branch
+        run: |
+          if git ls-remote --exit-code origin mrms-data >/dev/null 2>&1; then
+            git fetch --depth 1 origin mrms-data
+            git worktree add data origin/mrms-data
+          else
+            git worktree add --detach data
+            cd data && git checkout --orphan mrms-data && git rm -rfq . && cd ..
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: mrms/requirements.txt
+
+      - run: pip install -r mrms/requirements.txt
+
+      - name: Fetch MRMS for home point
+        env:
+          HOME_LAT: ${{ secrets.HOME_LAT }}
+          HOME_LON: ${{ secrets.HOME_LON }}
+          DATA_KEY: ${{ secrets.DATA_KEY }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          BACKFILL_FROM: ${{ github.event.inputs.backfill_from }}
+          RESET: ${{ github.event.inputs.reset }}
+        run: python mrms/update.py data/mrms.json
+
+      - name: Save
+        if: github.event.inputs.dry_run != 'true'
+        working-directory: data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mrms.json
+          if git diff --cached --quiet; then echo "No change"; exit 0; fi
+          git commit -qm "MRMS update $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push origin HEAD:mrms-data
