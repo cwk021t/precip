@@ -271,10 +271,11 @@ async function refresh(){
     const today=todayStr(), nowH=localNow().slice(0,13);
     d.daily.time.forEach((t,i)=>{
       if(t>=today) return;
-      S.days[t]=Object.assign(S.days[t]||{},{r:r2((d.daily.rain_sum[i]||0)+(d.daily.showers_sum[i]||0)),s:r2(d.daily.snowfall_sum[i]||0),p:r2(d.daily.precipitation_sum[i]||0)});
+      const p=d.daily.precipitation_sum[i]||0;
+      S.days[t]=Object.assign(S.days[t]||{},{r:r2(Math.min(p,(d.daily.rain_sum[i]||0)+(d.daily.showers_sum[i]||0))),s:r2(d.daily.snowfall_sum[i]||0),p:r2(p)});
     });
     let r=0,s=0,p=0;
-    H.time.forEach((t,i)=>{if(t.slice(0,10)===today&&t.slice(0,13)<=nowH){r+=(H.rain[i]||0)+(H.showers[i]||0);s+=H.snowfall[i]||0;p+=H.precipitation[i]||0}});
+    H.time.forEach((t,i)=>{if(t.slice(0,10)===today&&t.slice(0,13)<=nowH){const hp=H.precipitation[i]||0;r+=Math.min(hp,(H.rain[i]||0)+(H.showers[i]||0));s+=H.snowfall[i]||0;p+=hp}});
     S.days[today]=Object.assign(S.days[today]||{},{r:r2(r),s:r2(s),p:r2(p)});
     await backfill(today,d.daily.time[0]);
     await loadNws();
@@ -332,7 +333,7 @@ async function getJson(url){
 // Backfill Jan 1 of last year → ~92 days ago from Open-Meteo's high-resolution historical forecasts
 // (archived HRRR/GFS-class model runs, ~3 km in the US) instead of the coarse ERA5 reanalysis
 async function backfill(today,firstFc){
-  const start=(+today.slice(0,4)-1)+'-01-01', tag='hf2|'+start+'|'+S.lat+','+S.lon;
+  const start=(+today.slice(0,4)-1)+'-01-01', tag='hf3|'+start+'|'+S.lat+','+S.lon;
   if(S.backfilled===tag) return;
   try{
     const q=new URLSearchParams({latitude:S.lat,longitude:S.lon,timezone:'auto',start_date:start,end_date:addDays(firstFc,-1),
@@ -342,7 +343,8 @@ async function backfill(today,firstFc){
     d.daily.time.forEach((t,i)=>{
       if(d.daily.precipitation_sum[i]==null) return;
       // Replace older estimates (keeps any gauge entries you typed in)
-      S.days[t]=Object.assign(S.days[t]||{},{r:r2((d.daily.rain_sum[i]||0)+((d.daily.showers_sum||[])[i]||0)),s:r2(d.daily.snowfall_sum[i]),p:r2(d.daily.precipitation_sum[i])});
+      const p=d.daily.precipitation_sum[i]||0;
+      S.days[t]=Object.assign(S.days[t]||{},{r:r2(Math.min(p,(d.daily.rain_sum[i]||0)+((d.daily.showers_sum||[])[i]||0))),s:r2(d.daily.snowfall_sum[i]),p:r2(p)});
     });
     S.backfilled=tag;
   }catch(e){}

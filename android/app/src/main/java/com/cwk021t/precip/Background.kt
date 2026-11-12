@@ -212,7 +212,7 @@ class PrecipWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
         if (cfg.optBoolean("nDaily", true) && local.hour >= 7 && sp.getString("lastDaily", "") != today) {
             var r = 0.0; var s = 0.0
             for (i in 0 until time.length()) if (time.getString(i).startsWith(yesterday)) {
-                r += d(rain, i) + d(showers, i); s += d(snow, i)
+                r += minOf(d(pr, i), d(rain, i) + d(showers, i)); s += d(snow, i)
             }
             if (r >= 0.01 || s >= 0.1) {
                 val parts = mutableListOf<String>()
