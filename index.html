@@ -186,6 +186,12 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
       <button class="btn full" id="gps">📍 Use my current location</button>
     </div>
     <div class="card">
+      <h2>Radar rainfall <span class="mut" id="radarState"></span></h2>
+      <label class="f">Radar data key</label>
+      <input id="radarKey" type="password" autocomplete="off" placeholder="Paste your DATA_KEY">
+      <div class="mut" style="margin-top:8px">Uses NOAA's radar + rain-gauge estimates (MRMS), updated hourly by your GitHub job, for rain totals. The key unlocks your private, encrypted data file.</div>
+    </div>
+    <div class="card">
       <h2>Alerts</h2>
       <div class="grid2" style="margin-top:0">
         <div><label class="f">Heavy rain (in / 24 h)</label><input id="thr" inputmode="decimal"></div>
@@ -206,7 +212,7 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
     <div class="card">
       <h2>Data</h2>
       <div class="grid2"><button class="btn" id="csv">Export CSV</button><button class="btn danger" id="reset">Reset log</button></div>
-      <div class="mut">Estimates come from Open-Meteo's high-resolution weather models (free) for your exact coordinates. They can run lower than radar-based apps for small or scattered storms. Gauge entries override them. Snow is shown as depth; totals use about 10:1 snow-to-water when you enter snow yourself.</div>
+      <div class="mut">Rain comes from NOAA radar + gauges (MRMS) when the radar key is set, otherwise from Open-Meteo weather models. Snow depth and the forecast always come from Open-Meteo. Gauge entries override them. Snow is shown as depth; totals use about 10:1 snow-to-water when you enter snow yourself.</div>
     </div>
   </section>
 </main>
@@ -235,7 +241,7 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
 const KEY='precip-log-v1';
 const DEF={lat:40.63,lon:-89.33,name:'Home',threshold:1,snowThreshold:4,nSoon:true,nHeavy:true,nDaily:true,nAhead:true,nNws:true,days:{}};
 const NATIVE=typeof window.Android!=='undefined';
-let S=load(),H=null,NWS=[],OFF=0,lastErr=null,viewMonth=null,viewYear=null,loading=false;
+let S=load(),H=null,NWS=[],OFF=0,lastErr=null,RADAR=null,radarErr=null,viewMonth=null,viewYear=null,loading=false;
 const $=id=>document.getElementById(id);
 
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.days)return Object.assign({},DEF,s)}catch(e){}return JSON.parse(JSON.stringify(DEF))}
@@ -253,8 +259,11 @@ const dateName=k=>new Date(k+'T12:00Z').toLocaleDateString([], {month:'short',da
 
 function val(k){
   const d=S.days[k]; if(!d) return null;
-  const rain=d.gr!=null?d.gr:(d.r||0), snow=d.gs!=null?d.gs:(d.s||0);
-  const snowLiquid=d.gs!=null?d.gs/10:Math.max(0,(d.p||0)-(d.r||0));
+  const modelSnowLiq=Math.max(0,(d.p||0)-(d.r||0));
+  // Radar (MRMS) measures total liquid; take the model's snow share out of it to get rain
+  const radarRain=d.m!=null?Math.max(0,d.m-Math.min(modelSnowLiq,d.m)):null;
+  const rain=d.gr!=null?d.gr:(radarRain!=null?radarRain:(d.r||0)), snow=d.gs!=null?d.gs:(d.s||0);
+  const snowLiquid=d.gs!=null?d.gs/10:(d.m!=null?Math.min(modelSnowLiq,d.m):modelSnowLiq);
   return {rain,snow,liquid:rain+snowLiquid,gauge:d.gr!=null||d.gs!=null};
 }
 function sum(from,to){let r=0,s=0,l=0;for(const k in S.days){if(k>=from&&k<=to){const v=val(k);r+=v.rain;s+=v.snow;l+=v.liquid}}return{rain:r,snow:s,liquid:l}}
@@ -279,9 +288,31 @@ async function refresh(){
     S.days[today]=Object.assign(S.days[today]||{},{r:r2(r),s:r2(s),p:r2(p)});
     await backfill(today,d.daily.time[0]);
     await loadNws();
+    await loadRadar();
     S.updated=Date.now(); lastErr=null; save();
   }catch(e){lastErr=e.message||String(e);toast('Update failed: '+lastErr)}
   loading=false; $('refresh').classList.remove('spin'); render();
+}
+
+const RADAR_URL='https://raw.githubusercontent.com/cwk021t/precip/mrms-data/mrms.json';
+async function loadRadar(){
+  radarErr=null;
+  if(!S.radarKey){RADAR=null;for(const k in S.days)delete S.days[k].m;return}
+  try{
+    const env=await getJson(RADAR_URL+'?t='+Date.now());
+    const b64=x=>Uint8Array.from(atob(x),c=>c.charCodeAt(0));
+    const key=await crypto.subtle.importKey('raw',await crypto.subtle.digest('SHA-256',new TextEncoder().encode(S.radarKey.trim())),'AES-GCM',false,['decrypt']);
+    let plain;
+    try{plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(env.n)},key,b64(env.c))}catch(e){throw new Error('wrong radar key')}
+    RADAR=JSON.parse(new TextDecoder().decode(plain));
+    for(const [k,[v]] of Object.entries(RADAR.days||{})){S.days[k]=Object.assign(S.days[k]||{},{m:r2(v)})}
+  }catch(e){radarErr=e.message||String(e);RADAR=null}
+}
+function rainingNow(){
+  if(!RADAR||!RADAR.hourly) return false;
+  const hrs=Object.entries(RADAR.hourly).sort();if(!hrs.length) return false;
+  const [k,[v]]=hrs[hrs.length-1];
+  return v>=0.01&&Date.now()-Date.parse(k)<2.5*3600e3;
 }
 
 async function loadNws(){
@@ -357,6 +388,8 @@ function render(){
   $('title').textContent=S.name||'Precip Log';
   $('status').textContent=lastErr?'⚠ Update failed: '+lastErr:(S.updated?'Updated '+new Date(S.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'Not updated yet');
   $('status').style.color=lastErr?'var(--bad)':'';
+  if(!lastErr&&RADAR) $('status').textContent+=' · Rain: NOAA radar';
+  $('radarState').textContent=!S.radarKey?'off':radarErr?'⚠ '+radarErr:RADAR?'✓ updated '+new Date(RADAR.updated).toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):'';
   renderHome(today); renderCal(today); renderYear(today);
 }
 
@@ -387,7 +420,7 @@ function renderHome(today){
   $('heroSnow').textContent='❄ '+fs(t.snow)+' in snow';
   $('hero').classList.toggle('snowy',t.snow>0&&t.snow/10>t.rain);
   const a=computeAlerts();
-  $('heroPill').innerHTML=a.next?`<span class="pill">${a.next}</span>`:(H?'<span class="pill">No precipitation in the next 6 h</span>':'');
+  $('heroPill').innerHTML=rainingNow()?'<span class="pill">🌧️ Raining now (radar)</span>':a.next?`<span class="pill">${a.next}</span>`:(H?'<span class="pill">No precipitation in the next 6 h</span>':'');
   $('alerts').innerHTML=a.out.map(([c,ic,t])=>`<div class="alert ${c}"><span class="ic">${ic}</span><span>${t}</span></div>`).join('');
   const sts=[['24 h',addDays(today,-1),today],['7 days',addDays(today,-6),today],['30 days',addDays(today,-29),today],['Year',today.slice(0,4)+'-01-01',today]];
   $('stats').innerHTML=sts.map(([l,a,b])=>{const v=sum(a,b);return `<div class="stat"><div class="l">${l}</div><div class="v">${fr(v.rain)}"</div><div class="s">❄ ${fs(v.snow)}"</div></div>`}).join('');
@@ -503,7 +536,7 @@ $('refresh').onclick=refresh;
 
 // Settings
 function fillSettings(){
-  $('locName').value=S.name||'';$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold;$('snowThr').value=S.snowThreshold;
+  $('locName').value=S.name||'';$('radarKey').value=S.radarKey||'';$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold;$('snowThr').value=S.snowThreshold;
   $('nSoon').checked=!!S.nSoon;$('nHeavy').checked=!!S.nHeavy;$('nDaily').checked=!!S.nDaily;$('nAhead').checked=!!S.nAhead;$('nNws').checked=!!S.nNws;
   if(NATIVE){$('nativeAlerts').style.display='block';$('webAlertsNote').style.display='none';updatePerm()}
 }
@@ -520,9 +553,10 @@ $('saveSet').onclick=()=>{
   const moved=Math.abs(lat-S.lat)>0.01||Math.abs(lon-S.lon)>0.01;
   if(moved&&Object.keys(S.days).length&&!confirm('Changing location starts a new log and clears gauge entries. Continue?')) return;
   if(moved){S.days={};delete S.backfilled}
+  const rk=$('radarKey').value.trim();const rkChanged=rk!==(S.radarKey||'');S.radarKey=rk;
   S.lat=lat;S.lon=lon;S.name=$('locName').value.trim()||'Home';if(thr>0)S.threshold=thr;const st=+$('snowThr').value;if(st>0)S.snowThreshold=st;
   S.nSoon=$('nSoon').checked;S.nHeavy=$('nHeavy').checked;S.nDaily=$('nDaily').checked;S.nAhead=$('nAhead').checked;S.nNws=$('nNws').checked;
-  save();toast('Settings saved');if(moved)refresh();else render();
+  save();toast('Settings saved');if(moved||rkChanged)refresh();else render();
 };
 $('allowN').onclick=()=>{try{Android.requestNotifications()}catch(e){}};
 $('testN').onclick=()=>{try{Android.testNotification()}catch(e){}};

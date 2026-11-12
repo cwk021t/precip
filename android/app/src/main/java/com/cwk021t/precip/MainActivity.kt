@@ -156,7 +156,7 @@ class MainActivity : Activity() {
         fun httpGet(url: String): String {
             val out = org.json.JSONObject()
             val host = try { java.net.URL(url).host } catch (e: Exception) { "" }
-            if (!(host.endsWith("open-meteo.com") || host == "api.weather.gov")) {
+            if (!(host.endsWith("open-meteo.com") || host == "api.weather.gov" || host == "raw.githubusercontent.com")) {
                 return out.put("status", 0).put("error", "Blocked host").toString()
             }
             return try {
