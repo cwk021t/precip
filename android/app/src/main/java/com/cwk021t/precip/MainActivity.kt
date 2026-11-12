@@ -42,15 +42,19 @@ class MainActivity : Activity() {
             .build()
 
         web = WebView(this)
-        setContentView(web)
+        // WebView ignores its own padding, so wrap it in a container that we inset instead
+        val root = android.widget.FrameLayout(this)
+        root.addView(web, android.widget.FrameLayout.LayoutParams(-1, -1))
+        setContentView(root)
 
-        // Android 15+ draws edge-to-edge; keep content clear of the status and nav bars
+        // Android 15+ draws edge-to-edge; keep content clear of the status bar, gesture bar and keyboard
         if (Build.VERSION.SDK_INT >= 30) {
-            web.setOnApplyWindowInsetsListener { v, insets ->
-                val i = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime())
+            root.setOnApplyWindowInsetsListener { v, insets ->
+                val i = insets.getInsets(WindowInsets.Type.systemBars() or WindowInsets.Type.ime() or WindowInsets.Type.displayCutout())
                 v.setPadding(i.left, i.top, i.right, i.bottom)
-                insets
+                WindowInsets.CONSUMED
             }
+            root.requestApplyInsets()
         }
 
         with(web.settings) {
