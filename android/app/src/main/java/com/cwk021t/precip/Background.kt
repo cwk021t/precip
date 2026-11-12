@@ -86,11 +86,12 @@ class PrecipWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
         val lon = cfg.optDouble("lon", Double.NaN)
         if (lat.isNaN() || lon.isNaN()) return Result.success()
         val threshold = cfg.optDouble("threshold", 1.0)
+        val snowThreshold = cfg.optDouble("snowThreshold", 4.0)
         val place = cfg.optString("name", "Home").ifBlank { "Home" }
 
         val url = String.format(
             Locale.US,
-            "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&timezone=auto&past_days=2&forecast_days=2" +
+            "https://api.open-meteo.com/v1/forecast?latitude=%.4f&longitude=%.4f&timezone=auto&past_days=2&forecast_days=4" +
                 "&precipitation_unit=inch&hourly=precipitation,rain,showers,snowfall,precipitation_probability",
             lat, lon
         )
@@ -138,7 +139,7 @@ class PrecipWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
             }
         }
 
-        // 2) Heavy total in the last 24 hours
+        // 2) Heavy total in the last 24 hours (already fell)
         if (cfg.optBoolean("nHeavy", true)) {
             var p24 = 0.0
             for (i in maxOf(0, i0 - 24) until i0) p24 += d(pr, i)
@@ -149,7 +150,65 @@ class PrecipWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
             }
         }
 
-        // 3) Morning summary of yesterday
+        // 3) Heavy rain or snow in the forecast (up to ~3 days ahead)
+        if (cfg.optBoolean("nAhead", true)) {
+            var bestR = 0.0; var bestRs = -1; var bestS = 0.0; var bestSs = -1
+            for (s in i0 until time.length()) {
+                var a = 0.0; var sn = 0.0
+                for (i in s until minOf(s + 24, time.length())) { a += d(pr, i); sn += d(snow, i) }
+                if (a > bestR) { bestR = a; bestRs = s }
+                if (sn > bestS) { bestS = sn; bestSs = s }
+            }
+            fun window(s: Int, arr: org.json.JSONArray, min: Double): Pair<String, String> {
+                var first = -1; var pk = s; var pv = -1.0
+                for (i in s until minOf(s + 24, time.length())) {
+                    val v = d(arr, i)
+                    if (first < 0 && v >= min) first = i
+                    if (v > pv) { pv = v; pk = i }
+                }
+                return when2(time.getString(if (first >= 0) first else s), today) to when2(time.getString(pk), today)
+            }
+            if (bestSs >= 0 && bestS >= snowThreshold) {
+                val day = time.getString(bestSs).substring(0, 10)
+                if (shouldWarn(sp, "aheadSnow", day, bestS)) {
+                    val (st, pk) = window(bestSs, snow, 0.1)
+                    Notifier.show(c, 4, "Heavy snow expected",
+                        String.format(Locale.US, "%s: about %.1f\" of snow starting %s, heaviest around %s.", place, bestS, st, pk))
+                }
+            }
+            if (bestRs >= 0 && bestR >= threshold) {
+                val day = time.getString(bestRs).substring(0, 10)
+                if (shouldWarn(sp, "aheadRain", day, bestR)) {
+                    val (st, pk) = window(bestRs, pr, 0.01)
+                    Notifier.show(c, 5, "Heavy rain expected",
+                        String.format(Locale.US, "%s: about %.2f\" in 24 hours starting %s, heaviest around %s. Good time to check the sump pumps.", place, bestR, st, pk))
+                }
+            }
+        }
+
+        // 4) National Weather Service watches and warnings for this point
+        if (cfg.optBoolean("nNws", true)) {
+            try {
+                val nws = JSONObject(get(String.format(Locale.US, "https://api.weather.gov/alerts/active?point=%.4f,%.4f", lat, lon)))
+                val feats = nws.optJSONArray("features")
+                val seen = (sp.getStringSet("nwsSeen", emptySet()) ?: emptySet()).toMutableSet()
+                val current = mutableSetOf<String>()
+                if (feats != null) for (k in 0 until feats.length()) {
+                    val p = feats.getJSONObject(k).getJSONObject("properties")
+                    val id = p.optString("id")
+                    val event = p.optString("event")
+                    if (id.isBlank() || !Regex("flood|winter|snow|ice|blizzard|freez|sleet|rain|storm", RegexOption.IGNORE_CASE).containsMatchIn(event)) continue
+                    current += id
+                    if (id in seen) continue
+                    val text = p.optString("headline").ifBlank { event }
+                    Notifier.show(c, 100 + (id.hashCode() and 0x3FF), event, "$place: $text")
+                }
+                // Remember only alerts that are still active
+                sp.edit().putStringSet("nwsSeen", (seen intersect current) + current).apply()
+            } catch (e: Exception) { }
+        }
+
+        // 5) Morning summary of yesterday
         if (cfg.optBoolean("nDaily", true) && local.hour >= 7 && sp.getString("lastDaily", "") != today) {
             var r = 0.0; var s = 0.0
             for (i in 0 until time.length()) if (time.getString(i).startsWith(yesterday)) {
@@ -166,6 +225,26 @@ class PrecipWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
         return Result.success()
     }
 
+    /** Warn once per forecast day, and again only if the amount grows by half or more. */
+    private fun shouldWarn(sp: android.content.SharedPreferences, key: String, day: String, amt: Double): Boolean {
+        val lastDay = sp.getString("${key}Day", "")
+        val lastAmt = sp.getFloat("${key}Amt", 0f).toDouble()
+        val warn = lastDay != day || amt >= lastAmt * 1.5
+        if (warn) sp.edit().putString("${key}Day", day).putFloat("${key}Amt", amt.toFloat()).apply()
+        return warn
+    }
+
+    private fun when2(t: String, today: String): String {
+        val d = t.substring(0, 10)
+        val tomorrow = java.time.LocalDate.parse(today).plusDays(1).toString()
+        val day = when (d) {
+            today -> "today"
+            tomorrow -> "tomorrow"
+            else -> java.time.LocalDate.parse(d).dayOfWeek.getDisplayName(java.time.format.TextStyle.FULL, Locale.US)
+        }
+        return "$day ${hour(t)}"
+    }
+
     private fun hour(t: String): String {
         val h = t.substring(11, 13).toInt()
         return "${if (h % 12 == 0) 12 else h % 12} ${if (h < 12) "AM" else "PM"}"
@@ -173,6 +252,8 @@ class PrecipWorker(ctx: Context, params: WorkerParameters) : Worker(ctx, params)
 
     private fun get(u: String): String {
         val con = URL(u).openConnection() as HttpURLConnection
+        con.setRequestProperty("User-Agent", "PrecipLog (github.com/cwk021t/precip)")
+        con.setRequestProperty("Accept", "application/geo+json, application/json")
         con.connectTimeout = 15000
         con.readTimeout = 15000
         return try { con.inputStream.bufferedReader().readText() } finally { con.disconnect() }

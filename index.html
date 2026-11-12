@@ -187,12 +187,16 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
     </div>
     <div class="card">
       <h2>Alerts</h2>
-      <label class="f">Heavy precipitation threshold (inches in 24 h)</label>
-      <input id="thr" inputmode="decimal">
+      <div class="grid2" style="margin-top:0">
+        <div><label class="f">Heavy rain (in / 24 h)</label><input id="thr" inputmode="decimal"></div>
+        <div><label class="f">Heavy snow (in / 24 h)</label><input id="snowThr" inputmode="decimal"></div>
+      </div>
       <div id="nativeAlerts" style="display:none;margin-top:6px">
         <div class="setrow" id="permRow"><div><div class="t">Notifications are off</div><div class="d2">Allow notifications so alerts work in the background</div></div><button class="btn pri" id="allowN">Allow</button></div>
         <div class="setrow"><div><div class="t">Rain or snow starting soon</div><div class="d2">Within the next 2 hours</div></div><label class="sw"><input type="checkbox" id="nSoon"><span></span></label></div>
-        <div class="setrow"><div><div class="t">Heavy totals</div><div class="d2">Last 24 h over your threshold</div></div><label class="sw"><input type="checkbox" id="nHeavy"><span></span></label></div>
+        <div class="setrow"><div><div class="t">Heavy rain or snow ahead</div><div class="d2">Forecast over your thresholds, up to 3 days out</div></div><label class="sw"><input type="checkbox" id="nAhead"><span></span></label></div>
+        <div class="setrow"><div><div class="t">Weather Service warnings</div><div class="d2">Flood watches, winter storm warnings and similar for your spot</div></div><label class="sw"><input type="checkbox" id="nNws"><span></span></label></div>
+        <div class="setrow"><div><div class="t">Heavy totals so far</div><div class="d2">Last 24 h went over your rain threshold</div></div><label class="sw"><input type="checkbox" id="nHeavy"><span></span></label></div>
         <div class="setrow"><div><div class="t">Daily summary</div><div class="d2">Each morning, if it rained or snowed yesterday</div></div><label class="sw"><input type="checkbox" id="nDaily"><span></span></label></div>
         <button class="btn full" id="testN" style="margin-top:8px">Send a test notification</button>
       </div>
@@ -229,14 +233,14 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
 
 <script>
 const KEY='precip-log-v1';
-const DEF={lat:40.63,lon:-89.33,name:'Home',threshold:1,nSoon:true,nHeavy:true,nDaily:true,days:{}};
+const DEF={lat:40.63,lon:-89.33,name:'Home',threshold:1,snowThreshold:4,nSoon:true,nHeavy:true,nDaily:true,nAhead:true,nNws:true,days:{}};
 const NATIVE=typeof window.Android!=='undefined';
-let S=load(),H=null,OFF=0,viewMonth=null,viewYear=null,loading=false;
+let S=load(),H=null,NWS=[],OFF=0,viewMonth=null,viewYear=null,loading=false;
 const $=id=>document.getElementById(id);
 
 function load(){try{const s=JSON.parse(localStorage.getItem(KEY));if(s&&s.days)return Object.assign({},DEF,s)}catch(e){}return JSON.parse(JSON.stringify(DEF))}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('Could not save')}syncNative()}
-function syncNative(){if(NATIVE){try{Android.saveConfig(JSON.stringify({lat:+S.lat,lon:+S.lon,name:S.name,threshold:+S.threshold,nSoon:!!S.nSoon,nHeavy:!!S.nHeavy,nDaily:!!S.nDaily}))}catch(e){}}}
+function syncNative(){if(NATIVE){try{Android.saveConfig(JSON.stringify({lat:+S.lat,lon:+S.lon,name:S.name,threshold:+S.threshold,snowThreshold:+S.snowThreshold,nSoon:!!S.nSoon,nHeavy:!!S.nHeavy,nDaily:!!S.nDaily,nAhead:!!S.nAhead,nNws:!!S.nNws}))}catch(e){}}}
 function toast(t){const el=$('toast');el.textContent=t;el.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('on'),2200)}
 const r2=x=>Math.round((+x||0)*100)/100;
 const localNow=()=>new Date(Date.now()+OFF*1000).toISOString().slice(0,16);
@@ -274,9 +278,45 @@ async function refresh(){
     H.time.forEach((t,i)=>{if(t.slice(0,10)===today&&t.slice(0,13)<=nowH){r+=(H.rain[i]||0)+(H.showers[i]||0);s+=H.snowfall[i]||0;p+=H.precipitation[i]||0}});
     S.days[today]=Object.assign(S.days[today]||{},{r:r2(r),s:r2(s),p:r2(p)});
     await backfill(today,d.daily.time[0]);
+    await loadNws();
     S.updated=Date.now(); save();
   }catch(e){toast('Update failed — showing saved data')}
   loading=false; $('refresh').classList.remove('spin'); render();
+}
+
+async function loadNws(){
+  try{
+    const res=await fetch(`https://api.weather.gov/alerts/active?point=${(+S.lat).toFixed(4)},${(+S.lon).toFixed(4)}`,{headers:{Accept:'application/geo+json'}});
+    if(!res.ok) return;
+    const j=await res.json();
+    NWS=(j.features||[]).map(f=>f.properties).filter(p=>/flood|winter|snow|ice|blizzard|freez|sleet|rain|storm/i.test(p.event||''));
+  }catch(e){}
+}
+function fmtWhen(t){
+  const today=todayStr(),d=t.slice(0,10);
+  const day=d===today?'today':d===addDays(today,1)?'tomorrow':dayName(d);
+  return day+' '+fmtHour(t);
+}
+// Find the wettest 24-hour window in the forecast ahead
+function heavyAhead(){
+  const res={rain:null,snow:null};
+  if(!H) return res;
+  const nowH=localNow().slice(0,13),i0=H.time.findIndex(t=>t.slice(0,13)>nowH);
+  if(i0<0) return res;
+  let bR={amt:0},bS={amt:0};
+  for(let s=i0;s<H.time.length;s++){
+    let a=0,sn=0;
+    for(let i=s;i<s+24&&i<H.time.length;i++){a+=H.precipitation[i]||0;sn+=H.snowfall[i]||0}
+    if(a>bR.amt)bR={amt:a,s};if(sn>bS.amt)bS={amt:sn,s};
+  }
+  const describe=(b,key)=>{
+    let first=null,pk=b.s,pv=-1;
+    for(let i=b.s;i<b.s+24&&i<H.time.length;i++){const v=H[key][i]||0;if(first===null&&v>=(key==='snowfall'?0.1:0.01))first=i;if(v>pv){pv=v;pk=i}}
+    return {amt:b.amt,start:H.time[first??b.s],peak:H.time[pk]};
+  };
+  if(bR.amt>=S.threshold) res.rain=describe(bR,'precipitation');
+  if(bS.amt>=S.snowThreshold) res.snow=describe(bS,'snowfall');
+  return res;
 }
 
 // Backfill Jan 1 of last year → ~92 days ago from the free archive, once per location
@@ -312,17 +352,19 @@ function computeAlerts(){
   if(!H) return {out,next};
   const nowH=localNow().slice(0,13), i0=H.time.findIndex(t=>t.slice(0,13)>nowH);
   if(i0<=0) return {out,next};
-  let rr=0,ss=0,start=null,pmax=0,n24=0,p24=0;
+  let rr=0,ss=0,start=null,pmax=0,p24=0;
   for(let i=i0;i<i0+6&&i<H.time.length;i++){
     const r=(H.rain[i]||0)+(H.showers[i]||0),s=H.snowfall[i]||0;
     if(!start&&(r>=0.01||s>=0.1)) start=H.time[i];
     rr+=r;ss+=s;pmax=Math.max(pmax,H.precipitation_probability[i]||0);
   }
-  for(let i=i0;i<i0+24&&i<H.time.length;i++) n24+=H.precipitation[i]||0;
   for(let i=Math.max(0,i0-24);i<i0;i++) p24+=H.precipitation[i]||0;
   if(start){next=`${ss>=0.1?'Snow':'Rain'} around ${fmtHour(start)}`;out.push(['',ss>=0.1?'❄️':'🌧️',`${ss>=0.1?'Snow':'Rain'} expected around ${fmtHour(start)}. Next 6 h: ${fr(rr)}" rain${ss>0?', '+fs(ss)+'" snow':''} · up to ${pmax}% chance.`])}
   if(p24>=S.threshold) out.push(['bad','⚠️',`${fr(p24)}" in the last 24 hours — over your ${fr(S.threshold)}" threshold.`]);
-  if(n24>=S.threshold) out.push(['warn','⚠️',`${fr(n24)}" forecast in the next 24 hours — over your ${fr(S.threshold)}" threshold.`]);
+  const ah=heavyAhead();
+  if(ah.snow) out.push(['warn','❄️',`<b>Heavy snow ahead:</b> about ${fs(ah.snow.amt)}" in 24 h starting ${fmtWhen(ah.snow.start)}, heaviest around ${fmtWhen(ah.snow.peak)}.`]);
+  if(ah.rain) out.push(['warn','🌊',`<b>Heavy rain ahead:</b> about ${fr(ah.rain.amt)}" in 24 h starting ${fmtWhen(ah.rain.start)}, heaviest around ${fmtWhen(ah.rain.peak)}.`]);
+  NWS.forEach(p=>out.unshift([/warning/i.test(p.event)?'bad':'warn','📢',`<b>${p.event}</b> (National Weather Service)${p.ends||p.expires?' until '+new Date(p.ends||p.expires).toLocaleString([], {weekday:'short',hour:'numeric',minute:'2-digit'}):''}. ${p.headline&&!p.headline.startsWith(p.event)?(p.headline||'').replace(/</g,'&lt;'):''}`]));
   return {out,next};
 }
 
@@ -448,8 +490,8 @@ $('refresh').onclick=refresh;
 
 // Settings
 function fillSettings(){
-  $('locName').value=S.name||'';$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold;
-  $('nSoon').checked=!!S.nSoon;$('nHeavy').checked=!!S.nHeavy;$('nDaily').checked=!!S.nDaily;
+  $('locName').value=S.name||'';$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold;$('snowThr').value=S.snowThreshold;
+  $('nSoon').checked=!!S.nSoon;$('nHeavy').checked=!!S.nHeavy;$('nDaily').checked=!!S.nDaily;$('nAhead').checked=!!S.nAhead;$('nNws').checked=!!S.nNws;
   if(NATIVE){$('nativeAlerts').style.display='block';$('webAlertsNote').style.display='none';updatePerm()}
 }
 function updatePerm(){try{$('permRow').style.display=Android.notificationsAllowed()?'none':'flex'}catch(e){}}
@@ -465,8 +507,8 @@ $('saveSet').onclick=()=>{
   const moved=Math.abs(lat-S.lat)>0.01||Math.abs(lon-S.lon)>0.01;
   if(moved&&Object.keys(S.days).length&&!confirm('Changing location starts a new log and clears gauge entries. Continue?')) return;
   if(moved){S.days={};delete S.backfilled}
-  S.lat=lat;S.lon=lon;S.name=$('locName').value.trim()||'Home';if(thr>0)S.threshold=thr;
-  S.nSoon=$('nSoon').checked;S.nHeavy=$('nHeavy').checked;S.nDaily=$('nDaily').checked;
+  S.lat=lat;S.lon=lon;S.name=$('locName').value.trim()||'Home';if(thr>0)S.threshold=thr;const st=+$('snowThr').value;if(st>0)S.snowThreshold=st;
+  S.nSoon=$('nSoon').checked;S.nHeavy=$('nHeavy').checked;S.nDaily=$('nDaily').checked;S.nAhead=$('nAhead').checked;S.nNws=$('nNws').checked;
   save();toast('Settings saved');if(moved)refresh();else render();
 };
 $('allowN').onclick=()=>{try{Android.requestNotifications()}catch(e){}};
