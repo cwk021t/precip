@@ -206,7 +206,7 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
     <div class="card">
       <h2>Data</h2>
       <div class="grid2"><button class="btn" id="csv">Export CSV</button><button class="btn danger" id="reset">Reset log</button></div>
-      <div class="mut">Estimates come from Open-Meteo (free) for your exact coordinates. Gauge entries override them. Snow is shown as depth; totals use about 10:1 snow-to-water when you enter snow yourself.</div>
+      <div class="mut">Estimates come from Open-Meteo's high-resolution weather models (free) for your exact coordinates. They can run lower than radar-based apps for small or scattered storms. Gauge entries override them. Snow is shown as depth; totals use about 10:1 snow-to-water when you enter snow yourself.</div>
     </div>
   </section>
 </main>
@@ -329,19 +329,20 @@ async function getJson(url){
   return res.json();
 }
 
-// Backfill Jan 1 of last year → ~92 days ago from the free archive, once per location
+// Backfill Jan 1 of last year → ~92 days ago from Open-Meteo's high-resolution historical forecasts
+// (archived HRRR/GFS-class model runs, ~3 km in the US) instead of the coarse ERA5 reanalysis
 async function backfill(today,firstFc){
-  const start=(+today.slice(0,4)-1)+'-01-01', tag=start+'|'+S.lat+','+S.lon;
+  const start=(+today.slice(0,4)-1)+'-01-01', tag='hf2|'+start+'|'+S.lat+','+S.lon;
   if(S.backfilled===tag) return;
   try{
     const q=new URLSearchParams({latitude:S.lat,longitude:S.lon,timezone:'auto',start_date:start,end_date:addDays(firstFc,-1),
-      precipitation_unit:'inch',daily:'precipitation_sum,rain_sum,snowfall_sum'});
-    const d=await getJson('https://archive-api.open-meteo.com/v1/archive?'+q);
+      precipitation_unit:'inch',daily:'precipitation_sum,rain_sum,showers_sum,snowfall_sum'});
+    const d=await getJson('https://historical-forecast-api.open-meteo.com/v1/forecast?'+q);
     if(!d.daily) return;
     d.daily.time.forEach((t,i)=>{
-      if(S.days[t]&&S.days[t].r!=null) return;
       if(d.daily.precipitation_sum[i]==null) return;
-      S.days[t]=Object.assign(S.days[t]||{},{r:r2(d.daily.rain_sum[i]),s:r2(d.daily.snowfall_sum[i]),p:r2(d.daily.precipitation_sum[i])});
+      // Replace older estimates (keeps any gauge entries you typed in)
+      S.days[t]=Object.assign(S.days[t]||{},{r:r2((d.daily.rain_sum[i]||0)+((d.daily.showers_sum||[])[i]||0)),s:r2(d.daily.snowfall_sum[i]),p:r2(d.daily.precipitation_sum[i])});
     });
     S.backfilled=tag;
   }catch(e){}
