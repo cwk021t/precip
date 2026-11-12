@@ -98,10 +98,13 @@ def point_value(key):
         g = pygrib.open(f.name).message(1)
         lat1 = g["latitudeOfFirstGridPointInDegrees"]
         lon1 = g["longitudeOfFirstGridPointInDegrees"]
-        dlat = g["jDirectIncrementInDegrees"]
-        dlon = g["iDirectIncrementInDegrees"]
-        jpos = g["jScansPositively"]
+        lat2 = g["latitudeOfLastGridPointInDegrees"]
+        lon2 = g["longitudeOfLastGridPointInDegrees"]
         nj, ni = g["Nj"], g["Ni"]
+        # MRMS omits the increment keys, so derive spacing from the grid corners
+        dlat = abs(lat2 - lat1) / (nj - 1)
+        dlon = abs(lon2 - lon1) / (ni - 1)
+        jpos = 1 if lat2 > lat1 else 0
         i = int(round(((LON % 360) - lon1) / dlon))
         j = int(round((LAT - lat1) / dlat)) if jpos else int(round((lat1 - LAT) / dlat))
         if not _logged_grid:
