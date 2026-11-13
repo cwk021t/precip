@@ -106,6 +106,18 @@ nav button{flex:1;border:none;background:none;color:var(--mut);font:inherit;font
 nav button svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--rain)}
 .view{display:none}.view.on{display:block}
+.map{position:relative;height:60vh;min-height:320px;overflow:hidden;border-radius:16px;touch-action:none;background:var(--chip);cursor:grab}
+.map .layer{position:absolute;inset:0;pointer-events:none;transition:opacity .25s}
+.map img.tile{position:absolute;left:0;top:0;width:256px;height:256px;user-select:none;-webkit-user-drag:none;pointer-events:none}
+.homedot{position:absolute;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 0 4px rgba(239,68,68,.25);z-index:4;pointer-events:none}
+.mapbtns{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:5}
+.mapbtn{width:40px;height:40px;border-radius:12px;border:none;background:var(--card);color:var(--tx);font-size:20px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.25);cursor:pointer}
+.attrib{position:absolute;left:0;right:0;bottom:0;font-size:9px;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.45));padding:10px 8px 3px;z-index:5;pointer-events:none}
+.frametime{position:absolute;left:10px;top:10px;z-index:5;background:var(--card);color:var(--tx);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:700;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.radarctl{display:flex;align-items:center;gap:12px;margin-top:12px}
+.radarctl input[type=range]{flex:1;accent-color:var(--rain)}
+.playbtn{width:44px;height:44px;border-radius:50%;border:none;background:var(--rain);color:#fff;font-size:18px;cursor:pointer;flex:none}
+.dbz{height:8px;border-radius:4px;background:linear-gradient(90deg,#04e9e7,#019ff4,#0300f4,#02fd02,#01c501,#008e00,#fdf802,#e5bc00,#fd9500,#fd0000,#d40000,#bc0000,#f800fd);margin-top:6px}
 
 .sheet-bg{position:fixed;inset:0;background:rgba(0,0,0,.4);opacity:0;pointer-events:none;transition:.2s;z-index:10}
 .sheet{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-radius:24px 24px 0 0;padding:10px 18px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .25s,visibility .25s;visibility:hidden;z-index:11;max-width:560px;margin:auto}
@@ -155,6 +167,25 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
       <div class="cal" id="cal"></div>
       <div class="totals" id="monthTotals"></div>
       <div class="mut" style="margin-top:10px">Tap a day to log your own gauge reading. <span style="color:var(--warn)">●</span> = gauge entry</div>
+    </div>
+  </section>
+
+  <!-- RADAR -->
+  <section class="view" id="v-radar">
+    <div class="card" style="padding:10px">
+      <div class="map" id="map">
+        <div class="layer" id="lyrBase"></div>
+        <div id="lyrRadar"></div>
+        <div class="layer" id="lyrLabels"></div>
+        <div class="homedot" id="homeDot"></div>
+        <div class="frametime" id="frameTime">—</div>
+        <div class="mapbtns"><button class="mapbtn" id="zin">+</button><button class="mapbtn" id="zout">−</button><button class="mapbtn" id="zhome" title="Center on home">⌖</button></div>
+        <div class="attrib">Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Map © OpenStreetMap contributors © CARTO</div>
+      </div>
+      <div class="radarctl"><button class="playbtn" id="play">▶</button><input type="range" id="frameSlider" min="0" max="6" step="1" value="6"></div>
+      <div class="dbz"></div>
+      <div style="display:flex;justify-content:space-between" class="mut"><span>Light</span><span>Moderate</span><span>Heavy</span><span>Hail</span></div>
+      <div class="mut" style="margin-top:6px">Past hour of radar in 10-minute steps, refreshed every 5 minutes. Drag to move, pinch or use +/− to zoom, double-tap to zoom in.</div>
     </div>
   </section>
 
@@ -220,6 +251,7 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
 <nav>
   <button class="on" data-v="home"><svg viewBox="0 0 24 24"><path d="M12 2.7S5 10 5 14.5A7 7 0 0 0 19 14.5C19 10 12 2.7 12 2.7z"/></svg>Today</button>
   <button data-v="cal"><svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="3"/><path d="M3 9.5h18M8 2.5v4M16 2.5v4"/></svg>Calendar</button>
+  <button data-v="radar"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5"/></svg>Radar</button>
   <button data-v="trends"><svg viewBox="0 0 24 24"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>Trends</button>
   <button data-v="set"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>Settings</button>
 </nav>
@@ -526,6 +558,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+b.dataset.v));
   if(b.dataset.v==='home') drawChart();
+  if(b.dataset.v==='radar') Radar.show(); else Radar.hide();
   window.scrollTo(0,0);
 });
 $('prev').onclick=()=>{viewMonth=addDays(viewMonth+'-01',-1).slice(0,7);renderCal(todayStr())};
@@ -533,6 +566,94 @@ $('next').onclick=()=>{viewMonth=addDays(viewMonth+'-28',5).slice(0,7);renderCal
 $('yprev').onclick=()=>{viewYear--;renderYear(todayStr())};
 $('ynext').onclick=()=>{viewYear++;renderYear(todayStr())};
 $('refresh').onclick=refresh;
+
+// ---------- Radar map (no external libraries) ----------
+const Radar=(()=>{
+  const el=$('map'),T=256,MINZ=4,MAXZ=11;
+  const FRAMES=[50,40,30,20,10,0]; // minutes old (IEM keeps 5-minute steps up to 55 min)
+  const dark=()=>matchMedia('(prefers-color-scheme: dark)').matches;
+  const carto=kind=>(z,x,y)=>`https://${'abcd'[(x+y)%4]}.basemaps.cartocdn.com/${dark()?'dark':'light'}_${kind}/${z}/${x}/${y}@2x.png`;
+  let z=8,cx=0,cy=0,frame=FRAMES.length-1,timer=null,bucket=0,active=false,refreshTimer=null;
+  const layers=[];
+  const mk=(div,url,cls)=>({div,url,tiles:{}});
+  const base=mk($('lyrBase'),carto('nolabels'));
+  const labels=mk($('lyrLabels'),carto('only_labels'));
+  let radar=[];
+  function buildRadar(){
+    const host=$('lyrRadar');host.innerHTML='';
+    radar=FRAMES.map((m,i)=>{
+      const div=document.createElement('div');div.className='layer';div.style.opacity=i===frame?0.75:0;host.appendChild(div);
+      const name='nexrad-n0q-900913'+(m?'-m'+String(m).padStart(2,'0')+'m':'');
+      return mk(div,(z,x,y)=>`https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/${name}/${z}/${x}/${y}.png?b=${bucket}`);
+    });
+  }
+  function proj(lat,lon){const s=Math.sin(lat*Math.PI/180);return [(lon+180)/360,0.5-Math.log((1+s)/(1-s))/(4*Math.PI)]}
+  function home(){[cx,cy]=proj(+S.lat,+S.lon)}
+  function drawLayer(L,W,H,n,px,py){
+    const want={};
+    const x0=Math.floor((px-W/2)/T),x1=Math.floor((px+W/2)/T),y0=Math.max(0,Math.floor((py-H/2)/T)),y1=Math.min(n-1,Math.floor((py+H/2)/T));
+    for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++){
+      const k=z+'/'+x+'/'+y;want[k]=1;let img=L.tiles[k];
+      if(!img){img=new Image();img.className='tile';img.alt='';img.onerror=()=>{img.style.visibility='hidden'};img.src=L.url(z,((x%n)+n)%n,y);L.div.appendChild(img);L.tiles[k]=img}
+      img.style.transform=`translate(${Math.round(x*T-px+W/2)}px,${Math.round(y*T-py+H/2)}px)`;
+    }
+    for(const k in L.tiles) if(!want[k]){L.tiles[k].remove();delete L.tiles[k]}
+  }
+  function draw(){
+    if(!active) return;
+    const W=el.clientWidth,H=el.clientHeight,n=2**z,px=cx*T*n,py=cy*T*n;
+    [base,...radar,labels].forEach(L=>drawLayer(L,W,H,n,px,py));
+    const [hx,hy]=proj(+S.lat,+S.lon);
+    $('homeDot').style.transform=`translate(${Math.round(hx*T*n-px+W/2)}px,${Math.round(hy*T*n-py+H/2)}px)`;
+  }
+  function label(){
+    const m=FRAMES[frame];
+    $('frameTime').textContent=m?`${m} min ago`:'Latest';
+    $('frameSlider').value=frame;
+  }
+  function setFrame(i){frame=i;radar.forEach((L,j)=>L.div.style.opacity=j===i?0.75:0);label()}
+  function zoomAt(dz,sx,sy){
+    const nz=Math.max(MINZ,Math.min(MAXZ,z+dz));if(nz===z) return;
+    const W=el.clientWidth,H=el.clientHeight,f=T*2**z;
+    // keep the point under the finger in place
+    const wx=cx+(sx-W/2)/f,wy=cy+(sy-H/2)/f,k=2**(z-nz);
+    cx=wx-(wx-cx)*k;cy=wy-(wy-cy)*k;z=nz;draw();
+  }
+  function play(on){
+    clearInterval(timer);timer=null;$('play').textContent=on?'❚❚':'▶';
+    if(on){let hold=0;timer=setInterval(()=>{if(frame===FRAMES.length-1&&hold++<2)return;hold=0;setFrame((frame+1)%FRAMES.length)},700)}
+  }
+  function refresh(){const b=Math.floor(Date.now()/300e3);if(b!==bucket){bucket=b;buildRadar();draw()}}
+  // gestures
+  const ptrs=new Map();let pinch0=0,lastTap=0;
+  el.addEventListener('pointerdown',e=>{el.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});
+    if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinch0=Math.hypot(a.x-b.x,a.y-b.y)}
+    if(ptrs.size===1){const t=Date.now();if(t-lastTap<300){const r=el.getBoundingClientRect();zoomAt(1,e.clientX-r.left,e.clientY-r.top)}lastTap=t}});
+  el.addEventListener('pointermove',e=>{
+    const p=ptrs.get(e.pointerId);if(!p) return;
+    const f=T*2**z;
+    if(ptrs.size===1){cx-=(e.clientX-p.x)/f;cy-=(e.clientY-p.y)/f;cy=Math.max(0,Math.min(1,cy))}
+    p.x=e.clientX;p.y=e.clientY;
+    if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a.x-b.x,a.y-b.y),r=el.getBoundingClientRect(),mx=(a.x+b.x)/2-r.left,my=(a.y+b.y)/2-r.top;
+      if(d/pinch0>1.45){zoomAt(1,mx,my);pinch0=d}else if(d/pinch0<0.69){zoomAt(-1,mx,my);pinch0=d}}
+    draw();
+  });
+  const up=e=>{ptrs.delete(e.pointerId)};
+  el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
+  el.addEventListener('wheel',e=>{e.preventDefault();const r=el.getBoundingClientRect();zoomAt(e.deltaY<0?1:-1,e.clientX-r.left,e.clientY-r.top)},{passive:false});
+  $('zin').onclick=()=>zoomAt(1,el.clientWidth/2,el.clientHeight/2);
+  $('zout').onclick=()=>zoomAt(-1,el.clientWidth/2,el.clientHeight/2);
+  $('zhome').onclick=()=>{home();draw()};
+  $('play').onclick=()=>play(!timer);
+  $('frameSlider').oninput=e=>{play(false);setFrame(+e.target.value)};
+  ['zin','zout','zhome','play','frameSlider'].forEach(id=>$(id).addEventListener('pointerdown',e=>e.stopPropagation()));
+  window.addEventListener('resize',draw);
+  return {
+    show(){active=true;if(!cx)home();refresh();label();draw();play(true);refreshTimer=setInterval(refresh,60e3)},
+    hide(){active=false;play(false);clearInterval(refreshTimer)},
+    recenter(){home();draw()}
+  };
+})();
 
 // Settings
 function fillSettings(){
@@ -556,7 +677,7 @@ $('saveSet').onclick=()=>{
   const rk=$('radarKey').value.trim();const rkChanged=rk!==(S.radarKey||'');S.radarKey=rk;
   S.lat=lat;S.lon=lon;S.name=$('locName').value.trim()||'Home';if(thr>0)S.threshold=thr;const st=+$('snowThr').value;if(st>0)S.snowThreshold=st;
   S.nSoon=$('nSoon').checked;S.nHeavy=$('nHeavy').checked;S.nDaily=$('nDaily').checked;S.nAhead=$('nAhead').checked;S.nNws=$('nNws').checked;
-  save();toast('Settings saved');if(moved||rkChanged)refresh();else render();
+  save();toast('Settings saved');if(moved)Radar.recenter();if(moved||rkChanged)refresh();else render();
 };
 $('allowN').onclick=()=>{try{Android.requestNotifications()}catch(e){}};
 $('testN').onclick=()=>{try{Android.testNotification()}catch(e){}};
