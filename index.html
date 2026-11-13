@@ -108,8 +108,8 @@ nav button.on{color:var(--rain)}
 .view{display:none}.view.on{display:block}
 .map{position:relative;height:60vh;min-height:320px;overflow:hidden;border-radius:16px;touch-action:none;background:var(--chip);cursor:grab}
 .map .layer{position:absolute;inset:0;pointer-events:none;transition:opacity .25s}
-#lyrBase{filter:grayscale(1) contrast(.9) brightness(1.04)}
-@media (prefers-color-scheme:dark){#lyrBase{filter:grayscale(1) invert(1) brightness(1.1) contrast(.85)}}
+.map.usgs #lyrBase{filter:grayscale(1) contrast(.9) brightness(1.04)}
+@media (prefers-color-scheme:dark){.map.usgs #lyrBase{filter:grayscale(1) invert(1) brightness(1.1) contrast(.85)}}
 .map img.tile{position:absolute;left:0;top:0;width:256px;height:256px;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .homedot{position:absolute;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 0 4px rgba(239,68,68,.25);z-index:4;pointer-events:none}
 .mapbtns{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:5}
@@ -178,10 +178,11 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
       <div class="map" id="map">
         <div class="layer" id="lyrBase"></div>
         <div id="lyrRadar"></div>
+        <div class="layer" id="lyrLabels"></div>
         <div class="homedot" id="homeDot"></div>
         <div class="frametime" id="frameTime">—</div>
         <div class="mapbtns"><button class="mapbtn" id="zin">+</button><button class="mapbtn" id="zout">−</button><button class="mapbtn" id="zhome" title="Center on home">⌖</button></div>
-        <div class="attrib">Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Map: USGS The National Map</div>
+        <div class="attrib" id="mapAttrib"></div>
       </div>
       <div class="radarctl"><button class="playbtn" id="play">▶</button><input type="range" id="frameSlider" min="0" max="6" step="1" value="6"></div>
       <div class="dbz"></div>
@@ -222,6 +223,9 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
       <label class="f">Radar data key</label>
       <input id="radarKey" type="password" autocomplete="off" placeholder="Paste your DATA_KEY">
       <div class="mut" style="margin-top:8px">Uses NOAA's radar + rain-gauge estimates (MRMS), updated hourly by your GitHub job, for rain totals. The key unlocks your private, encrypted data file.</div>
+      <label class="f" style="margin-top:14px">Map key (CARTO, optional)</label>
+      <input id="cartoKey" type="password" autocomplete="off" placeholder="Paste your free CARTO basemaps key">
+      <div class="mut" style="margin-top:8px">Street map style for the Radar tab. Without a key the map uses USGS The National Map.</div>
     </div>
     <div class="card">
       <h2>Alerts</h2>
@@ -577,7 +581,19 @@ const Radar=(()=>{
   let z=8,cx=0,cy=0,frame=FRAMES.length-1,timer=null,bucket=0,active=false,refreshTimer=null;
   const layers=[];
   const mk=(div,url,cls)=>({div,url,tiles:{}});
-  const base=mk($('lyrBase'),usgs);
+  // CARTO (needs your free key, stored only on this device), with labels drawn above the radar
+  const dark=()=>matchMedia('(prefers-color-scheme: dark)').matches;
+  const carto=kind=>(z,x,y)=>`https://basemaps.cartocdn.com/rastertiles/${dark()?'dark':'light'}_${kind}/${z}/${x}/${y}@2x.png?key=${encodeURIComponent(S.cartoKey)}`;
+  const base=mk($('lyrBase'),(z,x,y)=>S.cartoKey?carto('nolabels')(z,x,y):usgs(z,x,y));
+  const labels=mk($('lyrLabels'),(z,x,y)=>carto('only_labels')(z,x,y));
+  let mapSrc=null;
+  function syncSource(){
+    const src=S.cartoKey?'carto:'+S.cartoKey+':'+dark():'usgs';
+    if(src===mapSrc) return;
+    mapSrc=src;[base,labels].forEach(L=>{L.div.innerHTML='';L.tiles={}});
+    el.classList.toggle('usgs',!S.cartoKey);
+    $('mapAttrib').textContent='Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Map: '+(S.cartoKey?'© OpenStreetMap contributors © CARTO':'USGS The National Map');
+  }
   let radar=[];
   function buildRadar(){
     const host=$('lyrRadar');host.innerHTML='';
@@ -602,7 +618,8 @@ const Radar=(()=>{
   function draw(){
     if(!active) return;
     const W=el.clientWidth,H=el.clientHeight,n=2**z,px=cx*T*n,py=cy*T*n;
-    [base,...radar].forEach(L=>drawLayer(L,W,H,n,px,py));
+    syncSource();
+    (S.cartoKey?[base,...radar,labels]:[base,...radar]).forEach(L=>drawLayer(L,W,H,n,px,py));
     const [hx,hy]=proj(+S.lat,+S.lon);
     $('homeDot').style.transform=`translate(${Math.round(hx*T*n-px+W/2)}px,${Math.round(hy*T*n-py+H/2)}px)`;
   }
@@ -657,7 +674,7 @@ const Radar=(()=>{
 
 // Settings
 function fillSettings(){
-  $('locName').value=S.name||'';$('radarKey').value=S.radarKey||'';$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold;$('snowThr').value=S.snowThreshold;
+  $('locName').value=S.name||'';$('radarKey').value=S.radarKey||'';$('cartoKey').value=S.cartoKey||'';$('lat').value=S.lat;$('lon').value=S.lon;$('thr').value=S.threshold;$('snowThr').value=S.snowThreshold;
   $('nSoon').checked=!!S.nSoon;$('nHeavy').checked=!!S.nHeavy;$('nDaily').checked=!!S.nDaily;$('nAhead').checked=!!S.nAhead;$('nNws').checked=!!S.nNws;
   if(NATIVE){$('nativeAlerts').style.display='block';$('webAlertsNote').style.display='none';updatePerm()}
 }
@@ -674,7 +691,7 @@ $('saveSet').onclick=()=>{
   const moved=Math.abs(lat-S.lat)>0.01||Math.abs(lon-S.lon)>0.01;
   if(moved&&Object.keys(S.days).length&&!confirm('Changing location starts a new log and clears gauge entries. Continue?')) return;
   if(moved){S.days={};delete S.backfilled}
-  const rk=$('radarKey').value.trim();const rkChanged=rk!==(S.radarKey||'');S.radarKey=rk;
+  S.cartoKey=$('cartoKey').value.trim();const rk=$('radarKey').value.trim();const rkChanged=rk!==(S.radarKey||'');S.radarKey=rk;
   S.lat=lat;S.lon=lon;S.name=$('locName').value.trim()||'Home';if(thr>0)S.threshold=thr;const st=+$('snowThr').value;if(st>0)S.snowThreshold=st;
   S.nSoon=$('nSoon').checked;S.nHeavy=$('nHeavy').checked;S.nDaily=$('nDaily').checked;S.nAhead=$('nAhead').checked;S.nNws=$('nNws').checked;
   save();toast('Settings saved');if(moved)Radar.recenter();if(moved||rkChanged)refresh();else render();
