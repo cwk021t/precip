@@ -108,6 +108,8 @@ nav button.on{color:var(--rain)}
 .view{display:none}.view.on{display:block}
 .map{position:relative;height:60vh;min-height:320px;overflow:hidden;border-radius:16px;touch-action:none;background:var(--chip);cursor:grab}
 .map .layer{position:absolute;inset:0;pointer-events:none;transition:opacity .25s}
+#lyrBase{filter:grayscale(1) contrast(.9) brightness(1.04)}
+@media (prefers-color-scheme:dark){#lyrBase{filter:grayscale(1) invert(1) brightness(1.1) contrast(.85)}}
 .map img.tile{position:absolute;left:0;top:0;width:256px;height:256px;user-select:none;-webkit-user-drag:none;pointer-events:none}
 .homedot{position:absolute;left:0;top:0;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;background:#ef4444;border:2px solid #fff;box-shadow:0 0 0 4px rgba(239,68,68,.25);z-index:4;pointer-events:none}
 .mapbtns{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px;z-index:5}
@@ -176,11 +178,10 @@ label.f{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bot
       <div class="map" id="map">
         <div class="layer" id="lyrBase"></div>
         <div id="lyrRadar"></div>
-        <div class="layer" id="lyrLabels"></div>
         <div class="homedot" id="homeDot"></div>
         <div class="frametime" id="frameTime">—</div>
         <div class="mapbtns"><button class="mapbtn" id="zin">+</button><button class="mapbtn" id="zout">−</button><button class="mapbtn" id="zhome" title="Center on home">⌖</button></div>
-        <div class="attrib">Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Map © OpenStreetMap contributors © CARTO</div>
+        <div class="attrib">Radar: NOAA NEXRAD via Iowa Environmental Mesonet · Map: USGS The National Map</div>
       </div>
       <div class="radarctl"><button class="playbtn" id="play">▶</button><input type="range" id="frameSlider" min="0" max="6" step="1" value="6"></div>
       <div class="dbz"></div>
@@ -571,13 +572,12 @@ $('refresh').onclick=refresh;
 const Radar=(()=>{
   const el=$('map'),T=256,MINZ=4,MAXZ=11;
   const FRAMES=[50,40,30,20,10,0]; // minutes old (IEM keeps 5-minute steps up to 55 min)
-  const dark=()=>matchMedia('(prefers-color-scheme: dark)').matches;
-  const carto=kind=>(z,x,y)=>`https://${'abcd'[(x+y)%4]}.basemaps.cartocdn.com/${dark()?'dark':'light'}_${kind}/${z}/${x}/${y}@2x.png`;
+  // Base map: USGS The National Map (public domain, no API key). Note the tile path is z/y/x.
+  const usgs=(z,x,y)=>`https://basemap.nationalmap.gov/arcgis/rest/services/USGSTopo/MapServer/tile/${z}/${y}/${x}`;
   let z=8,cx=0,cy=0,frame=FRAMES.length-1,timer=null,bucket=0,active=false,refreshTimer=null;
   const layers=[];
   const mk=(div,url,cls)=>({div,url,tiles:{}});
-  const base=mk($('lyrBase'),carto('nolabels'));
-  const labels=mk($('lyrLabels'),carto('only_labels'));
+  const base=mk($('lyrBase'),usgs);
   let radar=[];
   function buildRadar(){
     const host=$('lyrRadar');host.innerHTML='';
@@ -602,7 +602,7 @@ const Radar=(()=>{
   function draw(){
     if(!active) return;
     const W=el.clientWidth,H=el.clientHeight,n=2**z,px=cx*T*n,py=cy*T*n;
-    [base,...radar,labels].forEach(L=>drawLayer(L,W,H,n,px,py));
+    [base,...radar].forEach(L=>drawLayer(L,W,H,n,px,py));
     const [hx,hy]=proj(+S.lat,+S.lon);
     $('homeDot').style.transform=`translate(${Math.round(hx*T*n-px+W/2)}px,${Math.round(hy*T*n-py+H/2)}px)`;
   }
